@@ -1,0 +1,364 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>React Trainer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Layout: Handy-Bühne (Breite --w); 3x3-Kreise mittig bei 57% Höhe wie im Original. Bewusst nur dunkles Design. */
+:root {
+  --bg: #121428;
+  --bg2: #1b1d36;
+  --peach: #f7c9a0;
+  --dot: #6b5a70;
+  --lit: #a8f06a;
+  --red: #ff4b4b;
+  --chip: #262842;
+  --font: "Syne", "Arial Black", system-ui, sans-serif;
+  --w: min(100vw, 60vh);
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: radial-gradient(120% 80% at 50% 35%, var(--bg2), var(--bg));
+  background-color: var(--bg);
+  color: var(--peach);
+  font-family: var(--font);
+  font-weight: 800;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.stage {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: var(--w);
+  transform: translateX(-50%);
+  z-index: 2;
+}
+.bar {
+  position: absolute;
+  top: 12px;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 6;
+}
+.bar button, .best {
+  background: var(--chip);
+  color: var(--peach);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5em 0.95em;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:active { transform: scale(0.94); }
+.bar button:focus-visible { outline: 2px solid var(--peach); outline-offset: 2px; }
+
+.flash {
+  position: fixed;
+  inset: 0;
+  background: #c4121f;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease-out;
+  z-index: 1;
+}
+.flash.on { opacity: 0.85; transition: none; }
+
+.grid {
+  position: absolute;
+  left: 50%;
+  top: 57%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(3, calc(var(--w) * 0.225));
+  gap: calc(var(--w) * 0.025);
+  z-index: 2;
+}
+.c {
+  width: calc(var(--w) * 0.225);
+  height: calc(var(--w) * 0.225);
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: var(--dot);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+  position: relative;
+  cursor: pointer;
+  font: inherit;
+  color: var(--peach);
+  transition: opacity 0.25s;
+}
+.c.lit { background: var(--lit); box-shadow: 0 0 calc(var(--w) * 0.06) rgba(168, 240, 106, 0.55); }
+.c .ms {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--w) * 0.04);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.c .pen {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 2px);
+  color: var(--red);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  font-size: calc(var(--w) * 0.035);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.hint {
+  position: absolute;
+  left: 0; right: 0;
+  top: 57%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: calc(var(--w) * 0.068);
+  line-height: 1.12;
+  z-index: 3;
+  display: none;
+  pointer-events: none;
+}
+.intro .hint { display: block; }
+.intro .c { opacity: 0.18; }
+
+.result {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 8, 18, 0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  z-index: 5;
+}
+.result[hidden], .rec[hidden] { display: none; }
+.rows { display: grid; grid-template-columns: auto auto; gap: 4px 14px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.rows span:nth-child(odd) { text-align: right; opacity: 0.85; }
+.rows span:nth-child(even) { text-align: left; color: #fff0d8; }
+.rows i { color: var(--red); font-style: normal; font-size: 12px; margin-left: 4px; }
+.sep { width: 150px; height: 2px; background: var(--peach); opacity: 0.4; margin: 6px 0; }
+.lbl { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.8; }
+.avg { font-size: calc(var(--w) * 0.13); color: var(--lit); font-variant-numeric: tabular-nums; }
+.rec { color: var(--lit); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button {
+  margin-top: 6px;
+  background: var(--lit);
+  color: #142600;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7em 1.8em;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.result button:focus-visible { outline: 3px solid var(--peach); outline-offset: 3px; }
+</style>
+
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best &Oslash;</b>--</div>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<div class="stage intro" id="stage">
+  <div class="grid" id="grid"></div>
+  <div class="hint">Tippe auf den<br>Kreis, der<br>aufleuchtet</div>
+</div>
+
+<div class="result" id="result" hidden>
+  <div class="rows" id="rows"></div>
+  <div class="sep"></div>
+  <div class="lbl">Durchschnitt</div>
+  <div class="avg" id="avg">0 ms</div>
+  <div class="rec" id="rec" hidden>Neue Bestzeit</div>
+  <button id="again" type="button">&#8635; Nochmal</button>
+</div>
+
+<script>
+(function () {
+  var ROUNDS = 5, PENALTY = 1000, SHOW_MS = 900, DELAY_MIN = 1200, DELAY_MAX = 3500;
+
+  var stage = document.getElementById("stage");
+  var grid = document.getElementById("grid");
+  var flash = document.getElementById("flash");
+  var bestEl = document.getElementById("best");
+  var resultEl = document.getElementById("result");
+  var rowsEl = document.getElementById("rows");
+  var avgEl = document.getElementById("avg");
+  var recEl = document.getElementById("rec");
+
+  var circles = [];
+  for (var i = 0; i < 9; i++) {
+    (function (idx) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "c";
+      b.setAttribute("aria-label", "Kreis " + (idx + 1));
+      b.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); tap(idx, e); });
+      grid.appendChild(b);
+      circles.push(b);
+    })(i);
+  }
+
+  var state = "idle", round = 0, litIdx = -1, litAt = 0, penalty = 0, times = [], pens = [], gen = 0, best = null;
+  try { var s = parseFloat(localStorage.getItem("react-best")); if (s > 0) best = s; } catch (e) {}
+  function showBest() { bestEl.innerHTML = "<b>Best &Oslash;</b>" + (best ? Math.round(best) + " ms" : "--"); }
+  showBest();
+
+  function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function clearCircles() {
+    circles.forEach(function (c) { c.classList.remove("lit"); c.innerHTML = ""; });
+  }
+
+  function nextRound() {
+    clearCircles();
+    round++;
+    penalty = 0;
+    litIdx = -1;
+    state = "wait";
+    later(light, rnd(DELAY_MIN, DELAY_MAX));
+  }
+  function light() {
+    var prev = litIdx;
+    litIdx = Math.floor(Math.random() * 9);
+    circles[litIdx].classList.add("lit");
+    litAt = performance.now();
+    // Zeit erst messen, wenn der Kreis wirklich gezeichnet ist
+    requestAnimationFrame(function () {
+      litAt = performance.now();
+      state = "lit";
+    });
+    state = "lighting";
+  }
+
+  function penaltyAt(idx) {
+    penalty += PENALTY;
+    var p = document.createElement("span");
+    p.className = "pen";
+    p.textContent = "+" + PENALTY + " ms";
+    var c = circles[idx];
+    var old = c.querySelector(".pen"); if (old) old.remove();
+    c.appendChild(p);
+    var g = gen;
+    setTimeout(function () { if (p.parentNode) p.remove(); }, 900);
+    flash.classList.add("on");
+    requestAnimationFrame(function () { requestAnimationFrame(function () { flash.classList.remove("on"); }); });
+  }
+
+  function tap(idx, e) {
+    if (state === "idle" || state === "done") { if (state === "idle") start(); return; }
+    if (state === "show") return;
+    if ((state === "lit" || state === "lighting") && idx === litIdx) {
+      var now = performance.now();
+      var rt = (now - litAt) + penalty;
+      times.push(rt); pens.push(penalty);
+      state = "show";
+      var c = circles[idx];
+      c.classList.remove("lit");
+      c.innerHTML = '<span class="ms">' + Math.round(rt) + " ms</span>";
+      if (round >= ROUNDS) later(finish, SHOW_MS);
+      else later(nextRound, SHOW_MS);
+      return;
+    }
+    // falscher Kreis oder zu früh getippt
+    penaltyAt(idx);
+  }
+
+  function finish() {
+    state = "done";
+    clearCircles();
+    var sum = 0;
+    rowsEl.innerHTML = "";
+    times.forEach(function (t, i) {
+      sum += t;
+      var a = document.createElement("span"); a.textContent = "Runde " + (i + 1) + ":";
+      var b = document.createElement("span"); b.textContent = Math.round(t) + " ms";
+      if (pens[i]) { var x = document.createElement("i"); x.textContent = "(+" + pens[i] + ")"; b.appendChild(x); }
+      rowsEl.appendChild(a); rowsEl.appendChild(b);
+    });
+    var avg = sum / times.length;
+    var rec = !best || avg < best;
+    if (rec) {
+      best = avg;
+      try { localStorage.setItem("react-best", String(avg)); } catch (e) {}
+      showBest();
+    }
+    recEl.hidden = !rec;
+    resultEl.hidden = false;
+    var t0 = performance.now(), g = gen;
+    (function count() {
+      if (g !== gen) return;
+      var p = Math.min(1, (performance.now() - t0) / 600);
+      avgEl.textContent = Math.round(avg * p) + " ms";
+      if (p < 1) requestAnimationFrame(count);
+    })();
+  }
+
+  function idle() {
+    gen++;
+    state = "idle";
+    round = 0; times = []; pens = []; penalty = 0; litIdx = -1;
+    clearCircles();
+    resultEl.hidden = true;
+    stage.classList.add("intro");
+  }
+  function start() {
+    if (state !== "idle") return;
+    stage.classList.remove("intro");
+    nextRound();
+  }
+
+  function bindTap(el, fn) {
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); });
+  }
+  bindTap(document.getElementById("reset"), idle);
+  bindTap(document.getElementById("again"), idle);
+  // Ausgegrauter Startbildschirm: Tippen irgendwo startet
+  document.addEventListener("pointerdown", function (e) {
+    if (state === "idle" && !e.target.closest(".bar") && resultEl.hidden) { e.preventDefault(); start(); }
+  });
+
+  idle();
+})();
+</script>
+
+</body></html>
