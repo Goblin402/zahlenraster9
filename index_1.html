@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Trainer</title>
+<style>
+:root{--bg:#050505;--cream:#fff0b0;--chip:#1c1c1c;color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--cream);font:800 16px "Arial Black",system-ui,sans-serif;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+h1{font-size:28px;margin:12px 0 20px}
+a{display:block;background:var(--chip);color:var(--cream);text-decoration:none;border-radius:16px;padding:18px 20px;margin-bottom:12px;font-size:20px}
+a small{display:block;font:600 13px system-ui,sans-serif;opacity:.65;margin-top:4px}
+</style>
+<h1>Trainer</h1>
+<a href="zahlenraster.html">Zahlenraster<small>1–16, mit Auto-Neustart</small></a>
+<a href="zahlenraster9.html">Zahlenraster Abschnitte<small>Hälften, Viertel, 4 Viertel mit Pause</small></a>
+<a href="diceroll.html">Dice Roll<small>4dice, 2die, num, 2+2</small></a>
+<a href="react.html">React<small>3×3 Reaktion, 5 Runden</small></a>
+<a href="zig.html">Zig<small>Zickzack-Bahn, Tippen wechselt die Richtung</small></a>
+
+</body></html>
