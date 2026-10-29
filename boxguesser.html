@@ -302,17 +302,19 @@ body {
     count = targetCount(l);
     var h = [];
     for (var i = 0; i < N * N; i++) h.push(0);
-    var ms = maxStack(l), placed = 0, guard = 0;
-    while (placed < count && guard++ < 500) {
-      var k = ri(0, N * N - 1);
-      var limit = (placed < Math.min(count, N * N) - 3) ? 1 : ms;
-      if (h[k] >= limit) continue;
-      // Stapel nur auf schon belegten Feldern, wenn Platz knapp oder Zufall
-      if (h[k] > 0 && Math.random() < 0.6) continue;
-      h[k]++;
+    // Erst alle Boxen einzeln auf freie Felder; gestapelt wird nur, wenn die Fläche voll ist
+    var cells = [];
+    for (var c = 0; c < N * N; c++) cells.push(c);
+    for (var a = cells.length - 1; a > 0; a--) { var b = ri(0, a); var t = cells[a]; cells[a] = cells[b]; cells[b] = t; }
+    var placed = 0;
+    while (placed < count) {
+      var lay = Math.floor(placed / (N * N));
+      h[cells[placed % (N * N)]] = lay + 1;
       placed++;
+      if (placed % (N * N) === 0) {
+        for (var a2 = cells.length - 1; a2 > 0; a2--) { var b2 = ri(0, a2); var t2 = cells[a2]; cells[a2] = cells[b2]; cells[b2] = t2; }
+      }
     }
-    count = placed;
     for (var k2 = 0; k2 < N * N; k2++) {
       var gx = k2 % N, gz = Math.floor(k2 / N);
       for (var s = 0; s < h[k2]; s++) {
@@ -324,8 +326,8 @@ body {
     }
   }
 
-  // Tempo: 94 % x 83 % x 95 % der ersten Version
-  function flyDuration(l) { return Math.max(520, 1150 - (l - 1) * 55) / (0.94 * 0.83 * 0.95); }
+  // Tempo bleibt in jedem Level gleich (Wert von Level 1: 94 % x 83 % x 95 % der ersten Version)
+  function flyDuration() { return 1150 / (0.94 * 0.83 * 0.95); }
 
   function startFly() {
     state = "fly";
