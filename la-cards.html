@@ -1,0 +1,877 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>LA Final Cards</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Layout: one column. Flat ground, cards drawn on grid paper (Karopapier). Fixed dock at the bottom for reveal / grading. */
+:root{
+  --bg:#F1F3F8; --grid:rgba(36,56,201,.075); --sheet:#FFFFFF; --sheet-2:#F1F4FB;
+  --ink:#101A33; --ink-2:#4A5675; --rule:#D3DAEA;
+  --accent:#2438C9; --accent-ink:#FFFFFF; --mark:rgba(255,208,0,.6);
+  --known:#18794E; --on-known:#FFFFFF; --again:#C4352A; --warn:#E5A800; --new:#C7CFE2;
+  --shadow:0 1px 0 rgba(16,26,51,.05),0 12px 26px -16px rgba(16,26,51,.4);
+  --f-display:'Bricolage Grotesque','Arial Narrow',system-ui,sans-serif;
+  --f-body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --f-math:'STIX Two Text','Times New Roman',serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D1323; --grid:rgba(140,170,255,.08); --sheet:#151F38; --sheet-2:#1B2845;
+  --ink:#E9EEFF; --ink-2:#A3B1D6; --rule:#2B3A5E;
+  --accent:#9DB0FF; --accent-ink:#0D1323; --mark:rgba(255,208,0,.3);
+  --known:#4CC38A; --on-known:#07170F; --again:#FF8272; --warn:#FFD60A; --new:#34456E;
+  --shadow:0 12px 26px -16px rgba(0,0,0,.8); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0D1323; --grid:rgba(140,170,255,.08); --sheet:#151F38; --sheet-2:#1B2845;
+  --ink:#E9EEFF; --ink-2:#A3B1D6; --rule:#2B3A5E;
+  --accent:#9DB0FF; --accent-ink:#0D1323; --mark:rgba(255,208,0,.3);
+  --known:#4CC38A; --on-known:#07170F; --again:#FF8272; --warn:#FFD60A; --new:#34456E;
+  --shadow:0 12px 26px -16px rgba(0,0,0,.8); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  font:16px/1.5 var(--f-body); background-color:var(--bg); color:var(--ink);
+  padding-block:14px 130px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.app{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px;min-width:0}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 16px}
+h1{font:800 32px/1 var(--f-display);letter-spacing:-.02em;margin:0}
+.sub{margin:7px 0 0;font:400 12px/1.3 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2)}
+.tabs{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--sheet)}
+.tabs button{border:0;background:transparent;color:var(--ink-2);padding:9px 15px;min-height:42px;font:700 14px var(--f-body);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+
+.bar{display:flex;height:10px;border-radius:2px;overflow:hidden;background:var(--new)}
+.bar i{display:block;height:100%}
+.bar .k{background:var(--known)}
+.bar .l{background:var(--warn)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font:400 12px var(--f-mono);color:var(--ink-2)}
+.legend b{color:var(--ink);font-weight:600}
+
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.chip{flex:none;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:4px;padding:8px 11px;min-height:38px;font:700 13px var(--f-body);cursor:pointer;white-space:nowrap}
+.chip small{font:400 11px var(--f-mono);color:var(--ink-2);margin-left:6px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] small{color:inherit;opacity:.8}
+
+.ctrls{display:flex;flex-wrap:wrap;gap:8px}
+.tg{border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:4px;padding:6px 11px;min-height:38px;font:700 13px var(--f-body);cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.tg::before{content:"";width:14px;height:14px;border:1.5px solid var(--ink-2);border-radius:3px;flex:none}
+.tg[aria-pressed="true"]::before{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--sheet)}
+.tg.plain::before{display:none}
+
+.nav{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ib{width:46px;height:46px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:4px;font:700 24px/1 var(--f-body);cursor:pointer}
+.ib:disabled{opacity:.35;cursor:default}
+.count{font:400 14px var(--f-mono);color:var(--ink-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+.count b{color:var(--ink);font-weight:600;font-size:18px}
+.pill{font:600 11px var(--f-mono);text-transform:uppercase;letter-spacing:.08em;padding:2px 6px;border-radius:3px;border:1px solid currentColor}
+.pill.s0{color:var(--ink-2)} .pill.s1{color:var(--again)} .pill.s2{color:var(--known)}
+
+.stage{perspective:1200px}
+.card{
+  background-color:var(--sheet);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:20px 20px;
+  border:1px solid var(--rule);border-radius:6px;box-shadow:var(--shadow);
+  padding:22px 18px 24px;transition:transform .14s ease-in;min-width:0;
+}
+.card.out{transform:rotateY(90deg)}
+.card.in{animation:turnIn .18s ease-out}
+@keyframes turnIn{from{transform:rotateY(-90deg)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.card,.card.in{animation:none;transition:none}}
+
+.tag{margin:0 0 10px;font:600 12px var(--f-mono);text-transform:uppercase;letter-spacing:.1em;color:var(--accent)}
+.q{font:800 26px/1.15 var(--f-display);letter-spacing:-.01em;margin:0 0 16px;text-wrap:balance}
+.q.sm{font-size:19px;margin-bottom:16px}
+.hint{margin:18px 0 0;color:var(--ink-2);font-size:14px}
+.lbl{margin:0 0 8px;font:600 11px var(--f-mono);text-transform:uppercase;letter-spacing:.12em;color:var(--ink-2)}
+.task{background:var(--sheet-2);border:1px dashed var(--rule);border-radius:4px;padding:12px 12px 4px}
+
+.steps{list-style:none;margin:0 0 18px;padding:0;counter-reset:s;display:grid;gap:10px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;align-items:baseline}
+.steps li::before{content:counter(s);font:600 13px var(--f-mono);color:var(--accent)}
+.steps.bul li::before{content:"•";font-size:18px;line-height:1}
+.steps li span{min-width:0;overflow-wrap:anywhere}
+
+.ex{background:var(--sheet-2);border:1px dashed var(--rule);border-radius:4px;padding:12px 12px 4px;margin-bottom:14px}
+.eq{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 10px;font:400 17px/1.35 var(--f-math);font-variant-numeric:tabular-nums;max-width:100%}
+.ln{margin:0 0 10px;font:400 16px/1.5 var(--f-math);overflow-wrap:anywhere}
+.nt{font:400 15px var(--f-math);color:var(--ink-2)}
+.op{padding:0 2px}
+.mx{position:relative;display:inline-grid;grid-template-columns:repeat(var(--c),auto);gap:2px 14px;padding:4px 13px;vertical-align:middle;text-align:center;font:400 17px var(--f-math);font-variant-numeric:tabular-nums}
+.mx::before,.mx::after{content:"";position:absolute;top:0;bottom:0;width:7px;border:1.5px solid currentColor}
+.mx::before{left:0;border-right:0}
+.mx::after{right:0;border-left:0}
+.mx.bar::before,.mx.bar::after{width:0;border-top:0;border-bottom:0}
+.mx.bar::before{border-right:0}
+.mx.bar::after{border-left:0}
+.mx .sep{border-right:1.5px solid currentColor;padding-right:9px}
+.fr{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;font-size:.92em;line-height:1.2;padding:0 .15em}
+.fr>span:first-child{border-bottom:1.5px solid currentColor;padding:0 .25em}
+.fr>span:last-child{padding:0 .25em}
+.ar{display:inline-flex;flex-direction:column;align-items:center;line-height:1.15;min-width:2.6em;text-align:center}
+.ar small{font:400 12px var(--f-math);color:var(--ink-2);white-space:nowrap}
+.ar b{font:400 20px var(--f-body);color:var(--accent)}
+mark.hl{background:linear-gradient(transparent 55%,var(--mark) 55%);color:inherit;padding:0 .08em}
+sup,sub{line-height:0}
+
+.tip{margin:0;padding-top:12px;border-top:1px solid var(--rule);font-size:15px}
+.tip .lbl{display:inline;margin-right:8px;color:var(--accent)}
+.fold{display:flex;justify-content:flex-end;margin:-8px 0 8px}
+.fold button{border:0;background:transparent;color:var(--ink-2);font:600 12px var(--f-mono);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;padding:6px 0;text-decoration:underline}
+
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--bg);border-top:1px solid var(--rule);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dock-in{max-width:720px;margin:0 auto;display:flex;gap:10px}
+.btn{flex:1 1 0;min-height:54px;border-radius:6px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font:700 17px var(--f-display);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.again{border-color:var(--again);color:var(--again)}
+.btn.known{background:var(--known);border-color:var(--known);color:var(--on-known)}
+kbd{font:600 11px var(--f-mono);opacity:.7;border:1px solid currentColor;border-radius:3px;padding:1px 5px}
+@media (hover:none){kbd{display:none}}
+
+.panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:22px 18px;box-shadow:var(--shadow)}
+.panel h2{font:800 24px/1.15 var(--f-display);margin:0 0 8px}
+.panel p{margin:0 0 16px;color:var(--ink-2)}
+.panel .row{display:flex;flex-wrap:wrap;gap:8px}
+.panel .btn{flex:1 1 170px}
+
+.grp{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 8px;font:800 19px var(--f-display)}
+.grp span{font:400 12px var(--f-mono);color:var(--ink-2)}
+.item{border:1px solid var(--rule);background:var(--sheet);border-radius:4px;margin-bottom:8px;min-width:0}
+.item summary{list-style:none;cursor:pointer;padding:13px 14px;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:center;font-weight:700}
+.item summary::-webkit-details-marker{display:none}
+.item summary::after{content:"+";font:600 18px var(--f-mono);color:var(--ink-2)}
+.item[open] summary::after{content:"–"}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--new)}
+.dot.s1{background:var(--warn)} .dot.s2{background:var(--known)}
+.itembody{padding:12px 14px 16px;border-top:1px dashed var(--rule)}
+
+footer{display:flex;justify-content:center;padding-top:6px}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>LA Final Cards</h1>
+      <p class="sub" id="sub">How to calculate it</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="View">
+      <button role="tab" data-tab="study" aria-selected="true">Study</button>
+      <button role="tab" data-tab="list" aria-selected="false">All steps</button>
+    </div>
+  </header>
+  <section aria-label="Progress">
+    <div class="bar" id="bar"><i class="k"></i><i class="l"></i></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <div class="chips" id="chips" aria-label="Topics"></div>
+  <div class="ctrls" id="ctrls"></div>
+  <main id="view"></main>
+  <footer><button class="tg plain" id="reset">Reset progress</button></footer>
+</div>
+<div class="dock" id="dock" hidden></div>
+
+<script>
+(function(){
+/* ---------- markup helpers ---------- */
+const tx=s=>String(s)
+  .replace(/\^\{-/g,'^{\u2212')
+  .replace(/\^\{([^}]*)\}/g,'<sup>$1</sup>')
+  .replace(/_\{([^}]*)\}/g,'<sub>$1</sub>')
+  .replace(/~([^~]+)~/g,'<i>$1</i>')
+  .replace(/\{\{(.+?)\}\}/g,'<mark class="hl">$1</mark>');
+const M=(rows,o)=>{o=o||{};const c=rows[0].length,aug=o.aug||0;
+  const cells=rows.map(r=>r.map((x,j)=>'<span'+(aug&&j===aug-1?' class="sep"':'')+'>'+tx(String(x).replace(/^-/,'\u2212'))+'</span>').join('')).join('');
+  return '<span class="mx'+(o.bar?' bar':'')+'" style="--c:'+c+'">'+cells+'</span>';};
+const D=rows=>M(rows,{bar:true});
+const fr=(a,b)=>'<span class="fr"><span>'+tx(a)+'</span><span>'+tx(b)+'</span></span>';
+const L=(...p)=>'<div class="eq">'+p.join('')+'</div>';
+const op=s=>'<span class="op">'+tx(s)+'</span>';
+const nt=s=>'<span class="nt">'+tx(s)+'</span>';
+const ar=l=>'<span class="ar"><small>'+tx(l)+'</small><b>→</b></span>';
+const P=s=>'<p class="ln">'+tx(s)+'</p>';
+
+/* ---------- content ---------- */
+const TOPICS=[
+ {id:'sys',name:'Systems'},{id:'alg',name:'Matrix algebra'},{id:'inv',name:'Inverses'},
+ {id:'det',name:'Determinants'},{id:'eig',name:'Eigenvalues'},{id:'sub',name:'Subspaces'},
+ {id:'orth',name:'Orthogonality'},{id:'jor',name:'Jordan form'},{id:'cay',name:'Cayley–Hamilton'}
+];
+const CARDS=[
+/* ===== Systems & row operations ===== */
+{id:'sys1',t:'sys',q:`Bring a matrix to row echelon form (Gauss elimination).`,
+ task:L(M([[1,2,1],[2,5,3],[1,0,2]])),
+ steps:[
+  `Take the leftmost column that is not all zeros. If its top entry is 0, swap rows so a nonzero entry sits on top.`,
+  `Scale that row so the leading entry (the pivot) becomes 1.`,
+  `Subtract multiples of the pivot row from every row below it, so the column below the pivot is 0.`,
+  `Cover the pivot row and column. Repeat on the smaller matrix that is left.`,
+  `Stop when no rows are left. Zero rows are at the bottom and every pivot is further right than the one above.`],
+ ex:L(M([[1,2,1],[2,5,3],[1,0,2]]),ar(`R_{2} − 2R_{1}<br>R_{3} − R_{1}`),M([[1,2,1],[0,1,1],[0,-2,1]]))+
+    L(ar(`R_{3} + 2R_{2}`),M([[1,2,1],[0,1,1],[0,0,3]]),ar(`R_{3} ÷ 3`),M([[1,2,1],[0,1,1],[0,0,1]])),
+ tip:`Only three moves are allowed: swap two rows, scale a row by c ≠ 0, add a multiple of one row to another. They never change the solution set.`},
+
+{id:'sys2',t:'sys',q:`Go from row echelon form to reduced row echelon form (RREF).`,
+ steps:[
+  `Start from a REF: every pivot is 1, zeros below each pivot.`,
+  `Take the lowest pivot. Subtract multiples of its row from the rows above, so everything above that pivot becomes 0.`,
+  `Move up to the next pivot and repeat.`,
+  `Done when every pivot is the only nonzero entry in its column.`],
+ ex:L(M([[1,2,1],[0,1,1],[0,0,1]]),ar(`R_{1} − R_{3}<br>R_{2} − R_{3}`),M([[1,2,0],[0,1,0],[0,0,1]]),ar(`R_{1} − 2R_{2}`),M([[1,0,0],[0,1,0],[0,0,1]])),
+ tip:`The RREF of a matrix is unique. A plain REF is not: different row operations give different REFs.`},
+
+{id:'sys3',t:'sys',q:`Solve a linear system and write down the whole solution set.`,
+ task:P(`~x~ + 2~y~ + ~z~ = 3`)+P(`2~x~ + 4~y~ + 3~z~ = 8`),
+ steps:[
+  `Write the augmented matrix [A | b] and row-reduce it to RREF.`,
+  `A row [0 … 0 | c] with c ≠ 0 means: no solution.`,
+  `Columns with a pivot belong to leading variables. Columns without a pivot are free variables: call them t, s, …`,
+  `Solve every pivot row for its leading variable.`,
+  `Write the solution as a particular vector plus parameter times direction vectors.`],
+ ex:L(M([[1,2,1,3],[2,4,3,8]],{aug:3}),ar(`R_{2} − 2R_{1}`),M([[1,2,1,3],[0,0,1,2]],{aug:3}),ar(`R_{1} − R_{2}`),M([[1,2,0,1],[0,0,1,2]],{aug:3}))+
+    P(`Pivots in columns 1 and 3, so ~y~ = ~t~ is free: ~x~ = 1 − 2~t~, ~z~ = 2.`)+
+    L(M([['~x~'],['~y~'],['~z~']]),op('='),M([[1],[0],[2]]),op('+ ~t~ ·'),M([[-2],[1],[0]])),
+ tip:`No free variable: unique solution. At least one free variable: infinitely many solutions.`},
+
+/* ===== Matrix algebra ===== */
+{id:'alg1',t:'alg',q:`Multiply two matrices and check that the product exists.`,
+ task:L(M([[1,0,2],[3,1,0]]),op('·'),M([[2,1],[1,0],[0,4]])),
+ steps:[
+  `Check the sizes: A is m×n and B is n×p. Columns of A must equal rows of B. The product AB is m×p.`,
+  `Entry (i, j) of AB is row i of A times column j of B: a_{i1}b_{1j} + a_{i2}b_{2j} + … + a_{in}b_{nj}.`,
+  `Falk's scheme: write B above and to the right of A. Each result entry sits where its row and column meet.`,
+  `Order matters. In general AB ≠ BA, and BA may not even exist.`],
+ ex:L(M([[1,0,2],[3,1,0]]),op('·'),M([[2,1],[1,0],[0,4]]),op('='),M([[2,9],[7,3]]))+
+    P(`Sizes: (2×3)·(3×2) gives 2×2.`)+
+    P(`Entry (1,2): 1·1 + 0·0 + 2·4 = 9. Entry (2,1): 3·2 + 1·1 + 0·0 = 7.`),
+ tip:`A (2×3) times a (2×3) is not defined: 3 columns against 2 rows.`},
+
+{id:'alg2',t:'alg',q:`Transpose a matrix and use the rules for sums and products.`,
+ steps:[
+  `Rows become columns: (A^{T})_{ij} = a_{ji}. An m×n matrix becomes n×m.`,
+  `(A + B)^{T} = A^{T} + B^{T}.`,
+  `(AB)^{T} = B^{T}A^{T}. The order flips.`,
+  `(A^{T})^{T} = A.`],
+ ex:L(nt(`A =`),M([[1,2,3],[4,5,6]]),nt(`A^{T} =`),M([[1,4],[2,5],[3,6]]))+P(`2×3 becomes 3×2.`),
+ tip:`Taking the transpose of a product reverses the order, just like taking off shoes and socks.`},
+
+{id:'alg3',t:'alg',q:`Decide whether a square matrix is symmetric, skew-symmetric or triangular.`,
+ steps:[
+  `Compute A^{T}.`,
+  `A = A^{T}: symmetric. Entries mirrored across the diagonal are equal.`,
+  `A = −A^{T}: skew-symmetric. Mirrored entries are opposites, so the diagonal is all 0.`,
+  `Triangular: all entries below (upper) or above (lower) the diagonal are 0. Both at once: diagonal matrix.`],
+ ex:L(nt(`A =`),M([[0,3],[-3,0]]),nt(`A^{T} =`),M([[0,-3],[3,0]]))+P(`A^{T} = −A, so A is {{skew-symmetric}}.`),
+ tip:`Every square matrix splits as A = ½(A + A^{T}) + ½(A − A^{T}): a symmetric part plus a skew part.`},
+
+{id:'alg4',t:'alg',q:`Build an elementary matrix and use it to do a row operation.`,
+ steps:[
+  `Apply the wanted row operation to the identity matrix I. The result is E.`,
+  `Multiplying from the left does the operation: E·A is A after that row operation.`,
+  `E is always invertible. E^{-1} is the elementary matrix of the opposite operation.`,
+  `A is nonsingular exactly when it is a product of elementary matrices.`],
+ ex:P(`Operation R_{2} ← R_{2} − 3R_{1} on a 2×2 matrix:`)+
+    L(nt(`E =`),M([[1,0],[-3,1]]),nt(`E^{-1} =`),M([[1,0],[3,1]]))+
+    L(M([[1,0],[-3,1]]),op('·'),M([[1,2],[3,4]]),op('='),M([[1,2],[0,-2]])),
+ tip:`Swapping rows 1 and 2 uses E = [[0,1],[1,0]].`},
+
+{id:'alg5',t:'alg',q:`Multiply partitioned (block) matrices.`,
+ steps:[
+  `Cut both matrices into blocks. Column cuts of the left matrix must match row cuts of the right one.`,
+  `Multiply like ordinary matrices, with blocks as entries. Keep the order of the factors.`,
+  `Use zero and identity blocks to simplify.`],
+ ex:L(M([['I','X'],['0','I']]),op('·'),M([['I','−X'],['0','I']]),op('='),M([['I','0'],['0','I']]))+
+    P(`Top right: I·(−X) + X·I = 0. Bottom right: 0·(−X) + I·I = I.`)+
+    P(`So the inverse of [[I, X],[0, I]] is [[I, −X],[0, I]].`),
+ tip:`Block sizes must be compatible, otherwise the block product is not defined.`},
+
+/* ===== Inverses ===== */
+{id:'inv1',t:'inv',q:`Decide quickly whether a square matrix is singular.`,
+ steps:[
+  `A zero row or zero column: singular.`,
+  `Two identical rows or columns, or one a multiple of another: singular.`,
+  `One row is a sum or combination of other rows: singular.`,
+  `2×2 or 3×3: compute det(A). det(A) = 0 means singular.`,
+  `Otherwise row-reduce. Nonsingular exactly when you get n pivots (RREF = I).`],
+ ex:L(M([[1,2,3],[4,5,6],[5,7,9]]),nt(`Row 3 = row 1 + row 2, so singular.`)),
+ tip:`Nonsingular ⇔ Ax = 0 has only x = 0 ⇔ RREF(A) = I ⇔ A is a product of elementary matrices.`},
+
+{id:'inv2',t:'inv',q:`Invert a 2×2 matrix.`,
+ task:L(M([[1,2],[3,4]])),
+ steps:[
+  `Compute det = ad − bc. If it is 0, there is no inverse.`,
+  `Swap the two diagonal entries a and d.`,
+  `Change the sign of b and c.`,
+  `Divide the whole matrix by det.`],
+ ex:L(nt(`det A = 1·4 − 2·3 = −2`))+
+    L(nt(`A^{-1} =`),fr('1','−2'),M([[4,-2],[-3,1]]),op('='),M([[-2,1],[fr('3','2'),fr('−1','2')]]))+
+    P(`Check: first row of A times first column: 1·(−2) + 2·(3/2) = 1 ✓`),
+ tip:`Always verify with A·A^{-1} = I.`},
+
+{id:'inv3',t:'inv',q:`Find the inverse with the Gauss–Jordan method.`,
+ task:L(M([[2,1],[1,1]])),
+ steps:[
+  `Write the block matrix [A | I].`,
+  `Row-reduce until the left block is I (RREF).`,
+  `The right block is now A^{-1}.`,
+  `If a zero row appears on the left, A is singular: no inverse.`],
+ ex:L(M([[2,1,1,0],[1,1,0,1]],{aug:2}),ar(`R_{1} − R_{2}`),M([[1,0,1,-1],[1,1,0,1]],{aug:2}))+
+    L(ar(`R_{2} − R_{1}`),M([[1,0,1,-1],[0,1,-1,2]],{aug:2}))+
+    L(nt(`A^{-1} =`),M([[1,-1],[-1,2]])),
+ tip:`Do every row operation on the whole row, both blocks.`},
+
+{id:'inv4',t:'inv',q:`Find the inverse with the adjugate (3×3).`,
+ task:L(M([[2,0,1],[1,1,0],[0,1,1]])),
+ steps:[
+  `Compute det(A). If it is 0, stop: no inverse.`,
+  `Sign pattern: + − + / − + − / + − +.`,
+  `For every entry delete its row and column. The 2×2 determinant that is left is the minor. Cofactor = sign × minor.`,
+  `Collect the cofactors in the cofactor matrix C. Then adj(A) = C^{T} (transpose it).`,
+  `A^{-1} = adj(A) / det(A).`],
+ ex:L(nt(`det A = 3.`),nt(`Minor of entry (1,1):`),D([[1,0],[1,1]]),nt(`= 1, so C_{11} = +1.`))+
+    L(nt(`C =`),M([[1,-1,1],[1,2,-2],[-1,1,2]]),nt(`adj A = C^{T} =`),M([[1,1,-1],[-1,2,1],[1,-2,2]]))+
+    L(nt(`A^{-1} =`),fr('1','3'),M([[1,1,-1],[-1,2,1],[1,-2,2]])),
+ tip:`Check one entry: A·adj(A) = det(A)·I.`},
+
+/* ===== Determinants ===== */
+{id:'det1',t:'det',q:`Compute a 3×3 determinant with the rule of Sarrus.`,
+ task:L(M([[2,0,1],[1,1,0],[0,1,1]])),
+ steps:[
+  `For 2×2: det = ad − bc.`,
+  `For 3×3: copy the first two columns to the right of the matrix.`,
+  `Add the three products along the diagonals running down to the right.`,
+  `Subtract the three products along the diagonals running up to the right.`,
+  `Sarrus works only for 3×3. Do not use it for 4×4.`],
+ ex:P(`Down-right: 2·1·1 + 0·0·0 + 1·1·1 = 3`)+P(`Up-right: 0·1·1 + 2·0·1 + 0·1·1 = 0`)+P(`det A = 3 − 0 = {{3}}`),
+ tip:`Cross-check with a cofactor expansion along a different row or column.`},
+
+{id:'det2',t:'det',q:`Compute a determinant by cofactor (Laplace) expansion.`,
+ steps:[
+  `Choose the row or column with the most zeros.`,
+  `For each entry compute a_{ij} · (−1)^{i+j} · M_{ij}, where M_{ij} is the minor (delete row i, column j).`,
+  `Add up the results.`,
+  `Works for every n and shrinks an n×n problem to (n−1)×(n−1) ones.`],
+ ex:L(M([[2,0,1],[1,1,0],[0,1,1]]),nt(`Expand along column 2:`))+
+    P(`det A = 0·C_{12} + 1·C_{22} + 1·C_{32}`)+
+    L(nt(`C_{22} = +`),D([[2,1],[0,1]]),nt(`= 2`),nt(`C_{32} = −`),D([[2,1],[1,0]]),nt(`= −(0 − 1) = 1`))+
+    P(`det A = 0 + 2 + 1 = {{3}}`),
+ tip:`Zero entries save you the whole minor.`},
+
+{id:'det3',t:'det',q:`Compute a determinant by row reduction.`,
+ steps:[
+  `Reduce to triangular form with row operations.`,
+  `Track the effect: a swap multiplies det by −1, scaling a row by c multiplies det by c, adding a multiple of a row changes nothing.`,
+  `Prefer only "add a multiple" operations, then there is nothing to track (swaps excepted).`,
+  `det of a triangular matrix = product of the diagonal.`],
+ ex:L(M([[2,4],[1,3]]),ar(`R_{1} − 2R_{2}`),M([[0,-2],[1,3]]),ar(`swap rows`),M([[1,3],[0,-2]]))+
+    P(`The first step keeps det. The swap flips the sign: det A = −(1·(−2)) = {{2}}.`)+
+    P(`Direct check: 2·3 − 4·1 = 2 ✓`),
+ tip:`Good for 4×4 and larger, where Sarrus is not allowed.`},
+
+{id:'det4',t:'det',q:`How do row (and column) operations change the determinant?`,
+ h:'Rules',bul:true,
+ steps:[
+  `Swap two rows (or columns): det × (−1).`,
+  `Multiply one row (or column) by c: det × c.`,
+  `Add a multiple of one row (or column) to another: det unchanged.`,
+  `All three rules hold for column operations too.`],
+ ex:L(nt(`A =`),M([[1,2],[3,4]]),nt(`det A = −2`))+
+    L(M([[3,4],[1,2]]),nt(`swap rows: det = 2`))+
+    L(M([[2,4],[3,4]]),nt(`row 1 × 2: det = −4`))+
+    L(M([[1,2],[0,-2]]),nt(`R_{2} − 3R_{1}: det = −2`)),
+ tip:`Because of rule 2, det(cA) = c^{n}·det(A) for an n×n matrix.`},
+
+{id:'det5',t:'det',q:`Which determinant rules speed up calculations?`,
+ h:'Rules',bul:true,
+ steps:[
+  `det(AB) = det(A)·det(B)`,
+  `det(A^{T}) = det(A)`,
+  `det(A^{-1}) = 1 / det(A)`,
+  `det(cA) = c^{n}·det(A) for an n×n matrix`,
+  `Triangular or diagonal matrix: det = product of the diagonal entries`,
+  `A zero row or column, or two equal rows: det = 0`],
+ ex:P(`Let A be 3×3 with det A = 2.`)+P(`det(2A) = 2^{3}·2 = 16`)+P(`det(A^{-1}) = 1/2`)+P(`det(A^{T}A) = 2·2 = 4`)+P(`det(A^{2}) = 4`),
+ tip:`det(A + B) ≠ det(A) + det(B) in general.`},
+
+{id:'det6',t:'det',q:`Solve a linear system with Cramer's rule.`,
+ task:P(`~x~ + 3~y~ = 5`)+P(`2~x~ + 2~y~ = 6`),
+ steps:[
+  `Write A and b. A must be square with det(A) ≠ 0.`,
+  `For x_{i}: replace column i of A by b. Call that matrix A_{i}.`,
+  `x_{i} = det(A_{i}) / det(A).`,
+  `Practical for 2×2 and 3×3 systems only.`],
+ ex:L(nt(`A =`),M([[1,3],[2,2]]),nt(`b =`),M([[5],[6]]),nt(`det A = 2 − 6 = −4`))+
+    L(nt(`A_{1} =`),M([[5,3],[6,2]]),nt(`det = 10 − 18 = −8`),nt(`x_{1} =`),fr('−8','−4'),nt(`= 2`))+
+    L(nt(`A_{2} =`),M([[1,5],[2,6]]),nt(`det = 6 − 10 = −4`),nt(`x_{2} =`),fr('−4','−4'),nt(`= 1`)),
+ tip:`Check in the first equation: 2 + 3·1 = 5 ✓`},
+
+{id:'det7',t:'det',q:`Get an area or volume from a determinant.`,
+ steps:[
+  `Write the spanning vectors as the columns of a square matrix.`,
+  `Compute its determinant.`,
+  `Area (2 vectors) or volume (3 vectors) = |det|.`,
+  `The sign tells the orientation. det = 0 means the vectors are dependent: no area or volume.`],
+ ex:L(nt(`u =`),M([[3],[1]]),nt(`v =`),M([[1],[2]]),nt(`[u v] =`),M([[3,1],[1,2]]))+
+    P(`det = 3·2 − 1·1 = 5, so area = |5| = {{5}}.`),
+ tip:`A linear map with matrix A scales every area (volume) by |det A|.`},
+
+/* ===== Eigenvalues ===== */
+{id:'eig1',t:'eig',q:`Find the eigenvalues of a square matrix.`,
+ task:L(M([[2,1],[1,2]])),
+ steps:[
+  `Form A − λI: subtract λ from every diagonal entry, everything else stays.`,
+  `Compute p(λ) = det(A − λI) (Sarrus, cofactors, or ad − bc).`,
+  `Solve p(λ) = 0. The roots are the eigenvalues.`,
+  `Check: sum of eigenvalues = trace, product = det(A).`],
+ ex:L(nt(`A − λI =`),M([['2 − λ',1],[1,'2 − λ']]))+
+    P(`det = (2 − λ)^{2} − 1 = λ^{2} − 4λ + 3 = {{(λ − 1)(λ − 3)}}`)+
+    P(`λ = 1 and λ = 3. Check: 1 + 3 = 4 = trace, 1·3 = 3 = det ✓`),
+ tip:`Triangular matrix: the eigenvalues are simply the diagonal entries.`},
+
+{id:'eig2',t:'eig',q:`Factor a characteristic polynomial of degree 3.`,
+ task:P(`p(λ) = λ^{3} − 6λ^{2} + 11λ − 6`),
+ steps:[
+  `Collect p(λ) completely. If a row or column has a common factor (λ − a), pull it out before expanding.`,
+  `Guess a root: try 0, the diagonal entries of A, and divisors of the constant term.`,
+  `Plug in. If p(λ_{0}) = 0, split off (λ − λ_{0}) by polynomial division.`,
+  `Solve the remaining quadratic with the pq-formula.`,
+  `Check the eigenvalues against trace and determinant.`],
+ ex:P(`Constant term −6. Try λ = 1: 1 − 6 + 11 − 6 = 0 ✓`)+
+    P(`p(λ) = (λ − 1)(λ^{2} − 5λ + 6)`)+
+    P(`pq: λ = 5/2 ± √(25/4 − 6) = 5/2 ± 1/2, so λ = 3 or 2`)+
+    P(`Result: {{λ = 1, 2, 3}}`),
+ tip:`The sum of the roots must equal the trace (here 6).`},
+
+{id:'eig3',t:'eig',q:`Find the eigenvectors for a given eigenvalue.`,
+ steps:[
+  `Compute A − λI for that eigenvalue.`,
+  `Solve (A − λI)x = 0 with Gauss. There must be at least one free variable (zero row).`,
+  `Each free variable gives one basis vector: set it to 1, the other free variables to 0.`,
+  `Any nonzero multiple of these vectors is an eigenvector. The number of free variables is the geometric multiplicity.`,
+  `Check: Av = λv.`],
+ ex:L(nt(`A =`),M([[2,1],[1,2]]))+
+    L(nt(`λ = 1:`),M([[1,1],[1,1]]),nt(`gives x_{1} + x_{2} = 0, so`),M([[1],[-1]]))+
+    L(nt(`λ = 3:`),M([[-1,1],[1,-1]]),nt(`gives x_{1} = x_{2}, so`),M([[1],[1]]))+
+    P(`Check: A·(1, 1) = (3, 3) = 3·(1, 1) ✓`),
+ tip:`Eigenvectors are never the zero vector, but the eigenvalue can be 0.`},
+
+{id:'eig4',t:'eig',q:`Which shortcuts give eigenvalues of related matrices?`,
+ h:'Rules',bul:true,
+ steps:[
+  `Triangular or diagonal: eigenvalues = diagonal entries.`,
+  `Sum of eigenvalues = trace, product = det.`,
+  `A^{k} has eigenvalues λ^{k}, A^{-1} has 1/λ, A + cI has λ + c. The eigenvectors stay the same.`,
+  `A and A^{T} have the same eigenvalues.`,
+  `Real symmetric or Hermitian: all eigenvalues are real.`],
+ ex:P(`A = [[2,1],[1,2]] has eigenvalues 1 and 3.`)+P(`A^{2}: 1 and 9`)+P(`A^{-1}: 1 and 1/3`)+P(`A + 2I: 3 and 5`),
+ tip:`A zero eigenvalue means det(A) = 0, so A is singular.`},
+
+{id:'eig5',t:'eig',q:`Diagonalize a matrix: find S and D with A = S D S^{-1}.`,
+ steps:[
+  `Find all eigenvalues and an eigenvector for each.`,
+  `You need n linearly independent eigenvectors. n distinct eigenvalues guarantee this.`,
+  `S has the eigenvectors as columns. D has the eigenvalues on the diagonal, in the same order.`,
+  `Then A = S D S^{-1}.`,
+  `If an eigenvalue has fewer independent eigenvectors than its multiplicity, A is not diagonalizable.`],
+ ex:P(`A = [[2,1],[1,2]], eigenpairs: λ = 1 with (1, −1) and λ = 3 with (1, 1).`)+
+    L(nt(`S =`),M([[1,1],[-1,1]]),nt(`D =`),M([[1,0],[0,3]]),nt(`S^{-1} =`),fr('1','2'),M([[1,-1],[1,1]])),
+ tip:`Check A·S = S·D column by column. That is just Av = λv again.`},
+
+{id:'eig6',t:'eig',q:`Compute a high power A^{k} with the diagonalization.`,
+ steps:[
+  `Diagonalize: A = S D S^{-1}.`,
+  `A^{k} = S D^{k} S^{-1}, because the inner S^{-1}S pairs cancel.`,
+  `D^{k}: raise every diagonal entry to the power k.`,
+  `Multiply out S · D^{k} · S^{-1}.`],
+ ex:L(nt(`A^{k} =`),fr('1','2'),M([[1,1],[-1,1]]),M([[1,0],[0,'3^{k}']]),M([[1,-1],[1,1]]),op('='),fr('1','2'),M([['1 + 3^{k}','3^{k} − 1'],['3^{k} − 1','1 + 3^{k}']]))+
+    L(nt(`k = 2:`),fr('1','2'),M([[10,8],[8,10]]),op('='),M([[5,4],[4,5]]),nt(`= A·A ✓`)),
+ tip:`Plug in k = 1 to get A back.`},
+
+/* ===== Subspaces & bases ===== */
+{id:'sub1',t:'sub',q:`Check whether a set S is a subspace.`,
+ steps:[
+  `Is the zero vector in S? If not, stop: not a subspace.`,
+  `Closed under addition: take x, y in S and show x + y is in S.`,
+  `Closed under scalar multiplication: take x in S and any scalar c, show cx is in S.`,
+  `To prove it, use general elements. To disprove it, one counterexample is enough.`],
+ ex:P(`S = {(x, y) : y = 2x}`)+
+    P(`Zero: 0 = 2·0 ✓. Sum: (x, 2x) + (x′, 2x′) = (x + x′, 2(x + x′)) ✓. Multiple: c(x, 2x) = (cx, 2cx) ✓. S is a subspace.`)+
+    P(`T = {(x, y) : y = x + 1}: (0, 0) is not in T, so {{not a subspace}}.`),
+ tip:`Planes and lines through the origin are subspaces. Shifted ones are not.`},
+
+{id:'sub2',t:'sub',q:`Test whether vectors are linearly independent.`,
+ steps:[
+  `Write the vectors as the columns of a matrix V.`,
+  `Row-reduce V.`,
+  `A pivot in every column: independent (Vx = 0 has only x = 0).`,
+  `A column without a pivot: dependent. That column is a combination of the pivot columns before it.`,
+  `n vectors in ℝ^{n}: independent exactly when det V ≠ 0.`],
+ ex:L(nt(`[v_{1} v_{2} v_{3}] =`),M([[1,0,1],[1,1,2],[0,1,1]]),ar(`R_{2} − R_{1}<br>R_{3} − R_{2}`),M([[1,0,1],[0,1,1],[0,0,0]]))+
+    P(`Column 3 has no pivot: dependent, v_{3} = v_{1} + v_{2}.`),
+ tip:`More vectors than the dimension of the space? Always dependent.`},
+
+{id:'sub3',t:'sub',q:`Decide whether a vector b lies in the span of given vectors.`,
+ steps:[
+  `Put the given vectors into the columns of V and append b: [V | b].`,
+  `Row-reduce.`,
+  `A row [0 … 0 | c] with c ≠ 0 means b is not in the span.`,
+  `Otherwise the solution c_{1}, …, c_{k} gives the coefficients of the combination.`],
+ ex:L(nt(`v_{1} =`),M([[1],[0],[1]]),nt(`v_{2} =`),M([[0],[1],[1]]),nt(`b =`),M([[2],[3],[5]]))+
+    P(`c_{1}v_{1} + c_{2}v_{2} = (c_{1}, c_{2}, c_{1} + c_{2}). Match b: c_{1} = 2, c_{2} = 3. Third entry: 2 + 3 = 5 ✓`)+
+    P(`So b = 2v_{1} + 3v_{2} is {{in the span}}.`),
+ tip:`If the third entry did not fit, b would be outside the span.`},
+
+{id:'sub4',t:'sub',q:`Find a basis and the dimension of the column space R(A) (the span of vectors).`,
+ task:P(`v_{1} = (1, 2, 3), v_{2} = (2, 4, 6), v_{3} = (0, 1, 1)`),
+ steps:[
+  `Put the vectors as columns of a matrix A.`,
+  `Row-reduce to REF and find the pivot columns.`,
+  `The pivot columns of the original A form a basis of R(A).`,
+  `dim R(A) = rank A = number of pivots.`],
+ ex:L(M([[1,2,0],[2,4,1],[3,6,1]]),ar(`R_{2} − 2R_{1}<br>R_{3} − 3R_{1}`),M([[1,2,0],[0,0,1],[0,0,1]]),ar(`R_{3} − R_{2}`),M([[1,2,0],[0,0,1],[0,0,0]]))+
+    P(`Pivots in columns 1 and 3. Basis: {v_{1}, v_{3}}, dim = {{2}}. Indeed v_{2} = 2v_{1}.`),
+ tip:`Take the columns from the original matrix, not from the reduced one.`},
+
+{id:'sub5',t:'sub',q:`Find a basis and the dimension of the null space N(A).`,
+ task:L(M([[1,2,1],[2,4,3]])),
+ steps:[
+  `Row-reduce A to RREF.`,
+  `Columns without a pivot belong to free variables. dim N(A) = number of free variables = n − rank A.`,
+  `For each free variable: set it to 1, the other free variables to 0, solve for the pivot variables. That is one basis vector.`,
+  `Check A·v = 0 for each vector.`],
+ ex:L(M([[1,2,1],[2,4,3]]),ar(`R_{2} − 2R_{1}`),M([[1,2,1],[0,0,1]]),ar(`R_{1} − R_{2}`),M([[1,2,0],[0,0,1]]))+
+    P(`~x~_{2} is free. ~x~_{3} = 0 and ~x~_{1} = −2~x~_{2}.`)+
+    L(nt(`N(A) = span`),M([[-2],[1],[0]]))+
+    P(`rank 2 + nullity 1 = 3 = n ✓`),
+ tip:`Rank–nullity: rank A + dim N(A) = n (number of columns).`},
+
+{id:'sub6',t:'sub',q:`Extend linearly independent vectors to a basis.`,
+ steps:[
+  `Know the dimension n of the space. Start with your independent vectors.`,
+  `Add standard basis vectors e_{1}, e_{2}, … one at a time.`,
+  `Keep e_{i} only if it is independent of the current list (a new pivot appears, or the determinant stays nonzero).`,
+  `Stop when you have n vectors.`,
+  `Shortcut: row-reduce [v_{1} … v_{k} e_{1} … e_{n}] and keep the pivot columns.`],
+ ex:P(`In ℝ^{3}: v = (1, 1, 0), w = (0, 1, 1). Try e_{1} = (1, 0, 0).`)+
+    P(`av + bw = (a, a + b, b) = (1, 0, 0) forces a = 1, b = 0, but then a + b = 1 ≠ 0. So e_{1} is independent.`)+
+    L(nt(`det [v w e_{1}] =`),D([[1,0,1],[1,1,0],[0,1,0]]),nt(`= 1 ≠ 0`))+
+    P(`Basis: {{ {v, w, e_{1}} }}`),
+ tip:`Any independent set of n vectors in an n-dimensional space is already a basis.`},
+
+/* ===== Orthogonality & unitary ===== */
+{id:'orth1',t:'orth',q:`Test whether a complex matrix is Hermitian.`,
+ steps:[
+  `Conjugate transpose A^{*}: transpose A and replace every entry by its complex conjugate (a + bi becomes a − bi).`,
+  `A is Hermitian exactly when A = A^{*}.`,
+  `So the diagonal must be real, and mirrored entries must be conjugates of each other.`,
+  `A real matrix is Hermitian exactly when it is symmetric.`],
+ ex:L(nt(`A =`),M([[2,'1 + i'],['1 − i',3]]),nt(`transpose:`),M([[2,'1 − i'],['1 + i',3]]))+
+    L(nt(`conjugate:`),M([[2,'1 + i'],['1 − i',3]]),nt(`= A`))+
+    P(`A is {{Hermitian}}.`),
+ tip:`Not Hermitian: [[1, i],[i, 1]], because A^{*} = [[1, −i],[−i, 1]] ≠ A.`},
+
+{id:'orth2',t:'orth',q:`Compute the inner product and length of complex vectors, and test orthogonality.`,
+ task:L(nt(`z =`),M([[1],['i']]),nt(`w =`),M([['i'],[1]])),
+ steps:[
+  `Inner product: ⟨z, w⟩ = z^{*}w = Σ conj(z_{k})·w_{k}. Conjugate the first vector.`,
+  `Length: ‖z‖ = √(z^{*}z) = √(Σ |z_{k}|²).`,
+  `z and w are orthogonal exactly when z^{*}w = 0.`,
+  `Normalize: z / ‖z‖ has length 1.`],
+ ex:P(`z^{*} = (1, −i), so z^{*}w = 1·i + (−i)·1 = 0. Orthogonal.`)+
+    P(`z^{*}z = 1·1 + (−i)(i) = 1 + 1 = 2, so ‖z‖ = {{√2}}.`),
+ tip:`Without the conjugate, i·i = −1 would give wrong lengths.`},
+
+{id:'orth3',t:'orth',q:`Turn independent vectors into an orthonormal set (Gram–Schmidt).`,
+ task:L(nt(`x_{1} =`),M([[1],[1],[0]]),nt(`x_{2} =`),M([[1],[0],[1]])),
+ steps:[
+  `Normalize the first vector: y_{1} = x_{1} / ‖x_{1}‖.`,
+  `Remove the "shadow" of x_{2} on y_{1}: z_{2} = x_{2} − (y_{1}^{*}x_{2})·y_{1}. Then y_{2} = z_{2} / ‖z_{2}‖.`,
+  `For a third vector subtract all shadows: z_{3} = x_{3} − (y_{1}^{*}x_{3})y_{1} − (y_{2}^{*}x_{3})y_{2}. Normalize.`,
+  `The y's are orthonormal and span the same space.`],
+ ex:P(`‖x_{1}‖ = √2, so y_{1} = (1/√2)(1, 1, 0).`)+
+    P(`y_{1}^{*}x_{2} = 1/√2, so z_{2} = (1, 0, 1) − ½(1, 1, 0) = (½, −½, 1).`)+
+    P(`‖z_{2}‖ = √(¼ + ¼ + 1) = √(3/2), so y_{2} = (1/√6)(1, −1, 2).`)+
+    P(`Check: y_{1}^{*}y_{2} = (1/√12)(1 − 1 + 0) = 0 ✓`),
+ tip:`Subtract the shadows from the original x, using the already normalized y's.`},
+
+{id:'orth4',t:'orth',q:`Check whether a matrix is unitary (or orthogonal) and invert it.`,
+ steps:[
+  `Compute U^{*}U. If it equals I, U is unitary. For real matrices use Q^{T}Q = I (orthogonal).`,
+  `Equivalent: the columns are an orthonormal set (length 1, pairwise inner product 0).`,
+  `The inverse is free: U^{-1} = U^{*} (Q^{-1} = Q^{T} in the real case).`,
+  `Products of unitary matrices are unitary again.`],
+ ex:L(nt(`U =`),fr('1','√2'),M([[1,1],['i','−i']]))+
+    P(`u_{1} = (1, i)/√2, u_{2} = (1, −i)/√2`)+
+    P(`u_{1}^{*}u_{2} = ½(1·1 + (−i)(−i)) = ½(1 − 1) = 0`)+
+    P(`u_{1}^{*}u_{1} = ½(1 + (−i)(i)) = 1. Same for u_{2}. So U is {{unitary}}.`),
+ tip:`Unitary matrices preserve lengths: ‖Ux‖ = ‖x‖.`},
+
+{id:'orth5',t:'orth',q:`Compute a Schur decomposition A = U T U^{*}.`,
+ task:L(M([[2,1],[-1,4]])),
+ steps:[
+  `Pick an eigenvalue λ_{1} and a unit eigenvector u_{1}.`,
+  `Extend u_{1} to an orthonormal basis (Gram–Schmidt). These vectors are the columns of U.`,
+  `U^{*}AU has λ_{1} in the top left and zeros below it. Repeat with the smaller block that is left.`,
+  `Result: U^{*}AU = T is upper triangular with the eigenvalues on the diagonal.`],
+ ex:P(`p(λ) = (2 − λ)(4 − λ) + 1 = (λ − 3)^{2}, so λ = 3 (double).`)+
+    P(`A − 3I = [[−1, 1],[−1, 1]] gives u_{1} = (1, 1)/√2. Complete with u_{2} = (1, −1)/√2.`)+
+    L(nt(`U =`),fr('1','√2'),M([[1,1],[1,-1]]),nt(`T = U^{T}AU =`),M([[3,-2],[0,3]])),
+ tip:`U and T are real if all eigenvalues of A are real. Otherwise they are complex in general.`},
+
+{id:'orth6',t:'orth',q:`Test whether a matrix is normal (unitarily diagonalizable).`,
+ steps:[
+  `Compute A^{*}A and AA^{*}.`,
+  `Equal: A is normal, so A is unitarily diagonalizable.`,
+  `Hermitian, skew-Hermitian and unitary matrices are all normal.`,
+  `The converse fails: a normal matrix does not have to be Hermitian.`],
+ ex:L(nt(`A =`),M([[1,1],[-1,1]]),nt(`A^{*} =`),M([[1,-1],[1,1]]))+
+    L(nt(`A^{*}A =`),M([[2,0],[0,2]]),nt(`AA^{*} =`),M([[2,0],[0,2]]))+
+    P(`Equal, so A is normal. But A ≠ A^{*}, so it is not Hermitian.`),
+ tip:`A normal matrix has n orthonormal eigenvectors.`},
+
+{id:'orth7',t:'orth',q:`Find a unitary matrix U that diagonalizes a Hermitian matrix.`,
+ steps:[
+  `Find the eigenvalues and eigenvectors.`,
+  `For a Hermitian matrix, eigenvectors of different eigenvalues are automatically orthogonal. Just normalize them.`,
+  `If an eigenvalue has two or more independent eigenvectors, run Gram–Schmidt inside that eigenspace only.`,
+  `Put all orthonormal eigenvectors into the columns of U, eigenvalues into D in the same order. Then U^{*}AU = D.`],
+ ex:P(`A = [[2,1],[1,2]]: v_{1} = (1, −1) for λ = 1, v_{2} = (1, 1) for λ = 3.`)+
+    P(`Already orthogonal: 1·1 + (−1)·1 = 0. Normalize with 1/√2.`)+
+    L(nt(`U =`),fr('1','√2'),M([[1,1],[-1,1]]),nt(`D =`),M([[1,0],[0,3]])),
+ tip:`D is real for every Hermitian matrix. The real symmetric case gives a real orthogonal U.`},
+
+/* ===== Jordan form ===== */
+{id:'jor1',t:'jor',q:`Find algebraic and geometric multiplicity, and decide diagonalizability.`,
+ steps:[
+  `Algebraic multiplicity a(λ): the exponent of (λ − λ_{i}) in the characteristic polynomial.`,
+  `Geometric multiplicity g(λ) = dim N(λI − A) = n − rank(λI − A).`,
+  `Always 1 ≤ g ≤ a.`,
+  `A is diagonalizable exactly when g(λ) = a(λ) for every eigenvalue.`],
+ ex:L(nt(`A =`),M([[2,1],[0,2]]))+
+    P(`p(λ) = (λ − 2)^{2}, so a = 2.`)+
+    L(nt(`2I − A =`),M([[0,-1],[0,0]]),nt(`has rank 1, so g = 2 − 1 = 1`))+
+    P(`g < a, so A is {{not diagonalizable}}. It has one Jordan block of size 2.`),
+ tip:`g = number of Jordan blocks for that eigenvalue. a = total size of those blocks.`},
+
+{id:'jor2',t:'jor',q:`Read the Jordan block sizes of one eigenvalue from ranks (Weyr characteristic).`,
+ task:P(`A 4×4 matrix has only the eigenvalue λ = 0 (a = 4). The ranks of A^{p} for p = 0, 1, 2, 3 are 4, 2, 1, 0.`),
+ steps:[
+  `Compute r_{p} = rank (λI − A)^{p} for p = 0, 1, 2, … until it reaches its final value (r_{0} = n).`,
+  `Weyr numbers: w_{p} = r_{p−1} − r_{p}.`,
+  `w_{1} = number of Jordan blocks (= g). The sum of all w_{p} = a. The last p with w_{p} > 0 is the size of the largest block.`,
+  `Number of blocks of size exactly p: w_{p} − w_{p+1}.`],
+ ex:P(`w_{1} = 4 − 2 = 2, w_{2} = 2 − 1 = 1, w_{3} = 1 − 0 = 1. Sum = 4 = a ✓`)+
+    P(`Two blocks. Largest has size 3.`)+
+    P(`Size 3: w_{3} − w_{4} = 1. Size 2: w_{2} − w_{3} = 0. Size 1: w_{1} − w_{2} = 1.`)+
+    L(nt(`J = J_{3}(0) ⊕ J_{1}(0) =`),M([[0,1,0,0],[0,0,1,0],[0,0,0,0],[0,0,0,0]])),
+ tip:`Repeat this for every eigenvalue of A.`},
+
+{id:'jor3',t:'jor',q:`Assemble the Jordan matrix of a matrix.`,
+ steps:[
+  `Jordan block J_{k}(λ): a k×k matrix with λ on the diagonal, 1 directly above the diagonal, 0 elsewhere.`,
+  `For each eigenvalue, find its block sizes (Weyr numbers: number of blocks = g, total size = a).`,
+  `Place the blocks of one eigenvalue on the diagonal, largest first.`,
+  `Put all eigenvalue groups on the diagonal of J, zeros everywhere else.`,
+  `Check: J is n×n and the diagonal shows each eigenvalue a times.`],
+ ex:P(`p(λ) = (λ − 2)^{3}(λ − 5). For λ = 2: a = 3, g = 2, so two blocks with total size 3: sizes 2 and 1. For λ = 5: one block of size 1.`)+
+    L(nt(`J =`),M([[2,1,0,0],[0,2,0,0],[0,0,2,0],[0,0,0,5]]))+
+    P(`J = J_{2}(2) ⊕ J_{1}(2) ⊕ J_{1}(5)`),
+ tip:`A matrix is diagonalizable exactly when all blocks have size 1.`},
+
+/* ===== Cayley–Hamilton ===== */
+{id:'cay1',t:'cay',q:`Use Cayley–Hamilton to get high powers or the inverse of a matrix.`,
+ steps:[
+  `Compute the characteristic polynomial p(x) = det(xI − A).`,
+  `Insert A: p(A) = 0. The constant term becomes a multiple of I.`,
+  `Solve for the highest power. Multiply by A and substitute again to reduce every bigger power.`,
+  `For the inverse: solve for the I-term and factor out A.`],
+ ex:P(`A = [[2,1],[1,2]]: p(x) = x^{2} − 4x + 3, so A^{2} − 4A + 3I = 0.`)+
+    P(`A^{2} = 4A − 3I`)+
+    P(`A^{3} = A·A^{2} = 4A^{2} − 3A = 4(4A − 3I) − 3A = {{13A − 12I}}`)+
+    L(nt(`A^{-1} = ⅓(4I − A) =`),fr('1','3'),M([[2,-1],[-1,2]])),
+ tip:`Check A³ with an eigenvalue: λ = 3 gives 27 = 13·3 − 12 ✓`},
+
+{id:'cay2',t:'cay',q:`Find the minimal polynomial and use it to test diagonalizability.`,
+ steps:[
+  `Factor the characteristic polynomial: p(x) = ∏(x − λ_{i})^{a_{i}}.`,
+  `m(x) = ∏(x − λ_{i})^{k_{i}} with 1 ≤ k_{i} ≤ a_{i}. k_{i} is the size of the largest Jordan block of λ_{i}.`,
+  `Find k_{i} by testing: take the smallest exponent for which the product of the factors (A − λ_{i}I)^{k_{i}} gives the zero matrix.`,
+  `A is diagonalizable exactly when m(x) has no repeated roots (all k_{i} = 1).`],
+ ex:L(nt(`A =`),M([[2,1],[0,2]]),nt(`A − 2I =`),M([[0,1],[0,0]]),nt(`≠ 0`))+
+    P(`But (A − 2I)^{2} = 0, so m(x) = (x − 2)^{2}: {{not diagonalizable}}.`)+
+    P(`B = 2I: B − 2I = 0, so m(x) = x − 2: diagonalizable.`)+
+    P(`C = diag(2, 2, 3): m(x) = (x − 2)(x − 3).`),
+ tip:`m(x) divides p(x), and every polynomial q with q(A) = 0 is a multiple of m(x).`}
+];
+
+/* ---------- state ---------- */
+const byId={};CARDS.forEach(c=>{byId[c.id]=c;});
+const KEY='la-final-cards-v1';
+const state={tab:'study',topic:'all',hideKnown:false,shuffle:false,order:null,status:{},pos:0,flipped:false};
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $=(s,r)=>(r||document).querySelector(s);
+const topicName=id=>(TOPICS.find(t=>t.id===id)||{}).name||'';
+function load(){try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j){
+  state.status=j.status||{};state.topic=j.topic||'all';state.hideKnown=!!j.hideKnown;state.shuffle=!!j.shuffle;
+  state.order=Array.isArray(j.order)&&j.order.length===CARDS.length&&j.order.every(id=>byId[id])?j.order:null;
+  if(state.topic!=='all'&&!TOPICS.some(t=>t.id===state.topic))state.topic='all';
+  if(state.shuffle&&!state.order)state.shuffle=false;}}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({status:state.status,topic:state.topic,hideKnown:state.hideKnown,shuffle:state.shuffle,order:state.order}));}catch(e){}}
+const st=id=>state.status[id]||0;
+const inTopic=id=>state.topic==='all'||byId[id].t===state.topic;
+function baseOrder(){return state.shuffle&&state.order?state.order:CARDS.map(c=>c.id);}
+function deck(){return baseOrder().filter(id=>inTopic(id)&&!(state.hideKnown&&st(id)===2));}
+function shuffled(){const a=CARDS.map(c=>c.id);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+
+/* ---------- rendering ---------- */
+function backHTML(c){
+  return '<div class="back"><h3 class="lbl">'+(c.h||'Steps')+'</h3>'+
+    '<'+'ol class="steps'+(c.bul?' bul':'')+'">'+c.steps.map(s=>'<li><span>'+tx(s)+'</span></li>').join('')+'</ol>'+
+    (c.ex?'<div class="ex"><h3 class="lbl">Worked example</h3>'+c.ex+'</div>':'')+
+    (c.tip?'<p class="tip"><span class="lbl">Note</span>'+tx(c.tip)+'</p>':'')+'</div>';
+}
+function frontHTML(c){
+  return '<p class="tag">'+topicName(c.t)+'</p><h2 class="q">'+tx(c.q)+'</h2>'+
+    (c.task?'<div class="task"><h3 class="lbl">Try it on</h3>'+c.task+'</div>':'')+
+    '<p class="hint">Say the steps out loud, then reveal them.</p>';
+}
+function renderChips(){
+  const all=[{id:'all',name:'All'}].concat(TOPICS);
+  $('#chips').innerHTML=all.map(t=>{
+    const k=t.id==='all'?CARDS.length:CARDS.filter(c=>c.t===t.id).length;
+    return '<button class="chip" data-t="'+t.id+'" aria-pressed="'+(state.topic===t.id)+'">'+t.name+'<small>'+k+'</small></button>';
+  }).join('');
+}
+function renderProg(){
+  const ids=CARDS.filter(c=>inTopic(c.id)).map(c=>c.id),n=ids.length||1;
+  const k=ids.filter(id=>st(id)===2).length,l=ids.filter(id=>st(id)===1).length,f=ids.length-k-l;
+  const bar=$('#bar');bar.children[0].style.width=(k/n*100)+'%';bar.children[1].style.width=(l/n*100)+'%';
+  $('#legend').innerHTML='<span><b>'+k+'</b> known</span><span><b>'+l+'</b> again</span><span><b>'+f+'</b> new</span><span>of '+ids.length+(state.topic==='all'?'':' in '+topicName(state.topic))+'</span>';
+}
+function renderCtrls(){
+  const c=$('#ctrls');
+  if(state.tab==='study'){
+    c.innerHTML='<button class="tg" id="tgHide" aria-pressed="'+state.hideKnown+'">Hide known</button><button class="tg" id="tgShuf" aria-pressed="'+state.shuffle+'">Shuffle</button>';
+  }else{
+    c.innerHTML='<button class="tg plain" id="expAll">Expand all</button><button class="tg plain" id="colAll">Collapse all</button>';
+  }
+}
+function setDock(mode){
+  const d=$('#dock');
+  if(mode==='front'){d.hidden=false;d.innerHTML='<div class="dock-in"><button class="btn primary" id="reveal">Show steps <kbd>space</kbd></button></div>';}
+  else if(mode==='back'){d.hidden=false;d.innerHTML='<div class="dock-in"><button class="btn again" id="again">Again <kbd>1</kbd></button><button class="btn known" id="known">Got it <kbd>2</kbd></button></div>';}
+  else{d.hidden=true;d.innerHTML='';}
+}
+const pillLabel=['new','again','known'];
+function renderStudy(anim){
+  const d=deck(),v=$('#view');
+  if(!d.length){
+    const hidden=CARDS.some(c=>inTopic(c.id));
+    v.innerHTML='<div class="panel"><h2>'+(hidden?'Everything here is marked known':'No cards in this selection')+'</h2><p>'+(hidden?'Nice. Show the known cards again to keep practicing.':'Pick another topic.')+'</p><div class="row"><button class="btn primary" id="showKnown">Show known cards</button></div></div>';
+    setDock(null);return;
+  }
+  if(state.pos>=d.length){
+    const all=baseOrder().filter(inTopic),k=all.filter(id=>st(id)===2).length,l=all.filter(id=>st(id)===1).length;
+    v.innerHTML='<div class="panel"><h2>Round finished</h2><p>'+k+' known, '+l+' marked again, '+(all.length-k-l)+' not rated yet in this selection.</p><div class="row"><button class="btn primary" id="restart">Restart deck</button>'+(k<all.length?'<button class="btn" id="missed">Only cards I have not nailed</button>':'')+'</div></div>';
+    setDock(null);return;
+  }
+  const c=byId[d[state.pos]];
+  const inner=state.flipped
+    ?'<p class="tag">'+topicName(c.t)+'</p><div class="fold"><button id="hide">Hide steps</button></div><h2 class="q sm">'+tx(c.q)+'</h2>'+backHTML(c)
+    :frontHTML(c);
+  v.innerHTML='<div class="nav"><button class="ib" id="prev" aria-label="Previous card"'+(state.pos===0?' disabled':'')+'>‹</button>'+
+    '<div class="count"><span><b>'+(state.pos+1)+'</b> / '+d.length+'</span><span class="pill s'+st(c.id)+'">'+pillLabel[st(c.id)]+'</span></div>'+
+    '<button class="ib" id="next" aria-label="Next card"'+(state.pos>=d.length-1?' disabled':'')+'>›</button></div>'+
+    '<div class="stage"><article class="card'+(anim?' in':'')+'" id="card">'+inner+'</article></div>';
+  setDock(state.flipped?'back':'front');
+}
+function renderList(){
+  const v=$('#view');let html='';
+  TOPICS.forEach(t=>{
+    if(state.topic!=='all'&&state.topic!==t.id)return;
+    const cs=CARDS.filter(c=>c.t===t.id);
+    html+='<h2 class="grp">'+t.name+'<span>'+cs.length+' cards</span></h2>';
+    cs.forEach(c=>{html+='<details class="item"><summary><span class="dot s'+st(c.id)+'"></span><span>'+tx(c.q)+'</span></summary><div class="itembody">'+backHTML(c)+'</div></details>';});
+  });
+  v.innerHTML=html;setDock(null);
+}
+function renderAll(anim){
+  renderChips();renderProg();renderCtrls();
+  document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===state.tab)));
+  if(state.tab==='study')renderStudy(anim);else renderList();
+}
+function toNav(){const n=$('.nav');if(n)n.scrollIntoView({block:'start',behavior:'auto'});}
+
+/* ---------- actions ---------- */
+let busy=false;
+function flip(){
+  if(busy||state.tab!=='study')return;
+  const c=$('#card');if(!c)return;
+  if(reduce){state.flipped=!state.flipped;renderStudy(false);return;}
+  busy=true;c.classList.add('out');
+  setTimeout(()=>{state.flipped=!state.flipped;renderStudy(true);busy=false;},140);
+}
+function go(dlt){
+  const d=deck();const p=state.pos+dlt;if(p<0||p>=d.length)return;
+  state.pos=p;state.flipped=false;renderStudy(false);toNav();
+}
+function grade(g){
+  const d=deck(),id=d[state.pos];if(!id||!state.flipped)return;
+  state.status[id]=g;state.flipped=false;
+  if(!(state.hideKnown&&g===2))state.pos++;
+  save();renderProg();renderStudy(false);toNav();
+}
+function resetView(){state.pos=0;state.flipped=false;}
+let resetArmed=0;
+document.addEventListener('click',e=>{
+  const card=e.target.closest('#card');
+  const b=e.target.closest('button');
+  if(!b){if(card&&!state.flipped)flip();return;}
+  const id=b.id;
+  if(b.dataset.tab){state.tab=b.dataset.tab;renderAll(false);return;}
+  if(b.dataset.t){state.topic=b.dataset.t;resetView();save();renderAll(false);return;}
+  if(id==='reveal'||(card&&!state.flipped&&b.closest('#card')))return flip();
+  if(id==='hide')return flip();
+  if(id==='again')return grade(1);
+  if(id==='known')return grade(2);
+  if(id==='prev')return go(-1);
+  if(id==='next')return go(1);
+  if(id==='tgHide'){state.hideKnown=!state.hideKnown;resetView();save();renderAll(false);return;}
+  if(id==='tgShuf'){state.shuffle=!state.shuffle;if(state.shuffle)state.order=shuffled();resetView();save();renderAll(false);return;}
+  if(id==='showKnown'){state.hideKnown=false;resetView();save();renderAll(false);return;}
+  if(id==='restart'){resetView();renderAll(false);return;}
+  if(id==='missed'){state.hideKnown=true;resetView();save();renderAll(false);return;}
+  if(id==='expAll'){document.querySelectorAll('.item').forEach(x=>{x.open=true;});return;}
+  if(id==='colAll'){document.querySelectorAll('.item').forEach(x=>{x.open=false;});return;}
+  if(id==='reset'){
+    const now=Date.now();
+    if(resetArmed&&now-resetArmed<4000){state.status={};resetArmed=0;resetView();save();b.textContent='Reset progress';renderAll(false);}
+    else{resetArmed=now;b.textContent='Tap again to erase all progress';setTimeout(()=>{if(resetArmed&&Date.now()-resetArmed>=3900){resetArmed=0;b.textContent='Reset progress';}},4000);}
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(state.tab!=='study'||e.metaKey||e.ctrlKey||e.altKey)return;
+  const tag=(e.target.tagName||'').toLowerCase();
+  if(e.key==='ArrowRight'){go(1);}
+  else if(e.key==='ArrowLeft'){go(-1);}
+  else if(e.key==='1'&&state.flipped){grade(1);}
+  else if(e.key==='2'&&state.flipped){grade(2);}
+  else if((e.key===' '||e.key==='Enter')&&tag!=='button'&&tag!=='summary'){e.preventDefault();if(!state.flipped)flip();}
+});
+
+load();
+$('#sub').textContent=CARDS.length+' cards · how to calculate it';
+renderAll(false);
+})();
+</script>
+
+</body></html>
