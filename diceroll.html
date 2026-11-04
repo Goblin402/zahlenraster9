@@ -335,13 +335,13 @@ body {
 @media (max-width: 360px) { .bar button, .best { font-size: 12px; padding: 0.5em 0.65em; } }
 </style>
 <div class="bar">
-  <div class="row">
+  <div class="row" hidden>
     <button id="modeBtn" type="button" aria-label="Modus wechseln">4dice</button>
     <button id="roundsBtn" type="button" aria-label="Anzahl Runden wechseln">10&times;</button>
     <button id="diffBtn" type="button" aria-label="Schwierigkeit wechseln">real</button>
   </div>
   <div class="row">
-    <button id="hearBtn" type="button" aria-label="Zahlen sehen oder hören">sehen</button>
+    <button id="hearBtn" type="button" aria-label="Zahlen sehen oder hören" hidden>sehen</button>
     <div class="best" id="best">Best --</div>
   </div>
 </div>
@@ -457,6 +457,8 @@ body {
     hard = localStorage.getItem("dr-diff") === "hard";
     hear = localStorage.getItem("dr-hear") === "1";
   } catch (e) {}
+  // Nur noch wie im echten Spiel: 4dice, 3 Runden, normale Wahrscheinlichkeiten, sehen (keine Übungsmodi)
+  mode = "4dice"; hard = false; hear = false;
 
   var state = "idle", round = 0, sum = 0, input = "", deck = [];
   var elapsed = 0, segStart = 0, raf = 0, gen = 0, best = null;
