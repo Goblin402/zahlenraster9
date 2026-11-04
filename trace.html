@@ -273,6 +273,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     phase = "trace"; t0 = now(); limit = timeFor(path.length - 1);
     tfill.style.transform = "scaleX(1)";
     timerEl.classList.add("on");
+    // Finger, die schon während der Vorführung liegen, sofort übernehmen
+    for (var id in held) if (tryGrab(+id)) break;
   }
   function fail(at) {
     if (phase !== "trace") return;
@@ -343,24 +345,42 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     active.x = x; active.y = y; finger = { x: x, y: y };
   }
+  // Alle Finger auf dem Feld merken, auch wenn sie vor Beginn des Nachzeichnens aufgesetzt wurden
+  var held = {};
+  function tryGrab(id) {
+    var h = held[id];
+    if (!h || active || phase !== "trace") return false;
+    // Start- bzw. letzter Punkt: großer Fangradius, damit Aufsetzen und Weiterziehen sicher klappt
+    var c = nodes[path[prog]];
+    if (Math.hypot(c.x - h.x, c.y - h.y) > sp * HIT_GRAB) return false;
+    active = { id: id, x: h.x, y: h.y, dx: h.x, dy: h.y, free: false };
+    finger = { x: h.x, y: h.y };
+    return true;
+  }
   cv.addEventListener("pointerdown", function (e) {
     e.preventDefault();
     if (state === "idle") { start(); return; }
-    if (phase !== "trace") return;
-    // Start- bzw. letzter Punkt: großer Fangradius, damit Aufsetzen und Weiterziehen sicher klappt
-    var c = nodes[path[prog]];
-    if (Math.hypot(c.x - e.clientX, c.y - e.clientY) > sp * HIT_GRAB) return;
-    active = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: e.clientX, dy: e.clientY, free: false };
-    finger = { x: e.clientX, y: e.clientY };
+    held[e.pointerId] = { x: e.clientX, y: e.clientY };
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    tryGrab(e.pointerId);
   });
   cv.addEventListener("pointermove", function (e) {
-    if (!active || e.pointerId !== active.id) return;
+    var h = held[e.pointerId];
+    if (!h) return;
+    if (!active || e.pointerId !== active.id) {
+      h.x = e.clientX; h.y = e.clientY;
+      tryGrab(e.pointerId);   // auf den Startpunkt gerutscht: jetzt greifen
+      return;
+    }
     var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     if (!evs.length) evs = [e];
     for (var i = 0; i < evs.length && active; i++) move(evs[i].clientX, evs[i].clientY);
+    h.x = e.clientX; h.y = e.clientY;
   });
-  function up(e) { if (active && e.pointerId === active.id) { active = null; finger = null; } }
+  function up(e) {
+    delete held[e.pointerId];
+    if (active && e.pointerId === active.id) { active = null; finger = null; }
+  }
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
   document.addEventListener("pointerdown", function (e) {
