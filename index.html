@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Trainer"><meta name="theme-color" content="#050505"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <script>
 /* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
 (function () {
@@ -19,23 +19,62 @@
 <style>
 :root{--bg:#050505;--cream:#fff0b0;--chip:#1c1c1c;color-scheme:dark}
 html,body{height:100%}
-body{background:var(--bg);color:var(--cream);font:800 16px "Arial Black",system-ui,sans-serif;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
-h1{font-size:28px;margin:12px 0 20px}
-a{display:block;background:var(--chip);color:var(--cream);text-decoration:none;border-radius:16px;padding:18px 20px;margin-bottom:12px;font-size:20px}
-a small{display:block;font:600 13px system-ui,sans-serif;opacity:.65;margin-top:4px}
+body{background:var(--bg);color:var(--cream);font:800 16px "Arial Black",system-ui,sans-serif;overflow:hidden}
+#menu{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(20px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+/* im Menü darf gescrollt werden, Zoom bleibt gesperrt */
+#menu, #menu * { touch-action: pan-y !important; }
+h1{font-size:28px;margin:8px 0 20px}
+#menu a{display:block;background:var(--chip);color:var(--cream);text-decoration:none;border-radius:16px;padding:18px 20px;margin-bottom:12px;font-size:20px}
+#menu a:active{transform:scale(.98)}
+#menu a small{display:block;font:600 13px system-ui,sans-serif;opacity:.65;margin-top:4px}
+#stage{position:absolute;inset:0;background:#000;z-index:10}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+/* zwischen den Knöpfen links (Modus-Box, 75, 9–16) und rechts (Reset/Best) in allen Spielen frei */
+#home{position:absolute;z-index:11;top:calc(12px + env(safe-area-inset-top,0px));left:max(104px,calc(50% - 73px));width:36px;height:36px;border-radius:50%;border:0;padding:0;background:rgba(0,0,0,.38);display:grid;place-items:center;cursor:pointer}
+#home:active{transform:scale(.9)}
+#home:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#home svg{width:16px;height:16px;opacity:.85}
 </style>
-<h1>Trainer</h1>
-<a href="zahlenraster.html">Zahlenraster<small>1–16, mit Auto-Neustart</small></a>
-<a href="zahlenraster2.html">Zahlenraster 2<small>1–16, neue Anordnung (4 · 1 · 14 · 10 …)</small></a>
-<a href="zahlenraster9.html">Zahlenraster Abschnitte<small>Hälften, Viertel, 4 Viertel mit Pause</small></a>
-<a href="diceroll.html">Dice Roll<small>4dice, 2die, num, 2+2</small></a>
-<a href="react.html">React<small>3×3 Reaktion, 5 Runden</small></a>
-<a href="zig.html">Zig<small>Zickzack-Bahn, Tippen wechselt die Richtung</small></a>
-<a href="boxguesser.html">Boxguesser<small>Boxen zählen, eine falsche Antwort und vorbei</small></a>
-<a href="swipe.html">Swipe Fast<small>4 Boxen, in Pfeilrichtung wischen</small></a>
-<a href="trace.html">Trace<small>Pfad merken und nachziehen</small></a>
-<a href="flap.html">Flap<small>Tippen, durch die Lücken fliegen</small></a>
-<a href="dangerwall.html">Dangerwall<small>Box zwischen Stachelwänden</small></a>
-<a href="la-cards.html">LA Final Cards<small>Lineare Algebra, Lernkarten</small></a>
-
+<div id="menu">
+  <h1>Trainer</h1>
+  <a href="zahlenraster.html" data-g="zahlenraster">Zahlenraster<small>1–16, mit Auto-Neustart</small></a>
+  <a href="zahlenraster2.html" data-g="zahlenraster2">Zahlenraster 2<small>1–16, neue Anordnung (4 · 1 · 14 · 10 …)</small></a>
+  <a href="zahlenraster9.html" data-g="zahlenraster9">Zahlenraster Abschnitte<small>Hälften, Viertel, 4 Viertel mit Pause</small></a>
+  <a href="diceroll.html" data-g="diceroll">Dice Roll<small>4dice, 2die, num, 2+2</small></a>
+  <a href="react.html" data-g="react">React<small>3×3 Reaktion, 5 Runden</small></a>
+  <a href="zig.html" data-g="zig">Zig<small>Zickzack-Bahn, Tippen wechselt die Richtung</small></a>
+  <a href="boxguesser.html" data-g="boxguesser">Boxguesser<small>Boxen zählen, eine falsche Antwort und vorbei</small></a>
+  <a href="swipe.html" data-g="swipe">Swipe Fast<small>4 Boxen, in Pfeilrichtung wischen</small></a>
+  <a href="trace.html" data-g="trace">Trace<small>Pfad merken und nachziehen</small></a>
+  <a href="flap.html" data-g="flap">Flap<small>Tippen, durch die Lücken fliegen</small></a>
+  <a href="dangerwall.html" data-g="dangerwall">Dangerwall<small>Box zwischen Stachelwänden</small></a>
+  <a href="la-cards.html" data-g="la-cards">LA Final Cards<small>Lineare Algebra, Lernkarten</small></a>
+</div>
+<div id="stage" hidden>
+  <iframe id="frame" title="Spiel"></iframe>
+  <button id="home" type="button" aria-label="Zurück zum Menü"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="#fff"><rect x="1" y="1" width="4" height="4" rx="1"/><rect x="6" y="1" width="4" height="4" rx="1"/><rect x="11" y="1" width="4" height="4" rx="1"/><rect x="1" y="6" width="4" height="4" rx="1"/><rect x="6" y="6" width="4" height="4" rx="1"/><rect x="11" y="6" width="4" height="4" rx="1"/><rect x="1" y="11" width="4" height="4" rx="1"/><rect x="6" y="11" width="4" height="4" rx="1"/><rect x="11" y="11" width="4" height="4" rx="1"/></g></svg></button>
+</div>
+<script>
+(function () {
+  // Alle Spiele in einer App: Menü, Spiel im Vollbild-Rahmen, Knopf oben in der Mitte zurück ins Menü.
+  var stage = document.getElementById("stage"), frame = document.getElementById("frame");
+  function open(g) {
+    frame.src = g + ".html";
+    stage.hidden = false;
+    try { history.replaceState(null, "", "#" + g); } catch (e) {}
+    setTimeout(function () { try { frame.focus(); } catch (e) {} }, 50);
+  }
+  function close() {
+    stage.hidden = true;
+    frame.src = "about:blank";   // Spiel wirklich beenden (Timer, Animation)
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  }
+  document.querySelectorAll("#menu a[data-g]").forEach(function (a) {
+    a.addEventListener("click", function (e) { e.preventDefault(); open(a.getAttribute("data-g")); });
+  });
+  document.getElementById("home").addEventListener("click", function (e) { e.preventDefault(); close(); });
+  var h = location.hash.replace("#", "");
+  if (h && document.querySelector('#menu a[data-g="' + h + '"]')) open(h);
+})();
+</script>
 </body></html>
