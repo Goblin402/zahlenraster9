@@ -154,9 +154,12 @@ body {
 
 <script>
 (function () {
-  // Gemessen: Level 1 = 12,6 s, Level 2 = 8,3 s, Level 3 = 6,45 s (in beiden Aufnahmen gleich).
-  // Der Balken blendet ab 70 % Restfüllung aus und ist bei 47 % ganz weg.
-  var DUR = [12.6, 8.3, 6.45], FADE_FROM = 0.70, FADE_TO = 0.47;
+  // Im Original gemessen: 12,6 s / 8,3 s / 6,45 s. Hier zufällig in einem Rahmen um diese Werte,
+  // jedes Level kürzer als das vorige. Der Balken blendet ab 70 % Restfüllung aus und ist bei 47 % ganz weg.
+  var RANGES = [[10, 15], [7, 10.5], [5, 8]], DUR = [12.6, 8.3, 6.45], FADE_FROM = 0.70, FADE_TO = 0.47;
+  function rollDurations() {
+    DUR = RANGES.map(function (r) { return Math.round((r[0] + Math.random() * (r[1] - r[0])) * 100) / 100; });
+  }
   var COLORS = { good: "#1ebe53", mid: "#f3930d", bad: "#e64040" };
   function colorFor(e) { return e < 0.3 ? COLORS.good : e < 1 ? COLORS.mid : COLORS.bad; }
 
@@ -178,6 +181,7 @@ body {
   }
   function idle() {
     state = "idle"; level = 0; errs = [];
+    rollDurations();
     res.classList.remove("on"); end.classList.remove("on");
     titleEl.textContent = "Tippe wenn fertig";
     track.style.display = ""; setBar(1);
@@ -255,7 +259,7 @@ body {
   bindTap(document.getElementById("again"), idle);
 
   idle();
-  window.__tu = { get s() { return { state: state, level: level, errs: errs.slice(), t: (performance.now() - t0) / 1000 }; } };
+  window.__tu = { get s() { return { state: state, level: level, errs: errs.slice(), dur: DUR.slice(), t: (performance.now() - t0) / 1000 }; } };
 })();
 </script>
 <style>
