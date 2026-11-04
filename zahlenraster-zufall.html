@@ -102,11 +102,30 @@ body {
   margin-right: 4px;
 }
 .bar button.auto[aria-pressed="true"] { background: var(--cream); opacity: 1; }
-.phase {
+.toprow {
   position: absolute;
   left: 50%;
   top: calc(64px + env(safe-area-inset-top, 0px));
   transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+}
+.newbtn {
+  background: #1c1c1c;
+  color: var(--cream);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45em 1.1em;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.newbtn:active { transform: scale(0.94); }
+.newbtn:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+.grid.pre .tile { background: #3a3a3a !important; color: transparent; pointer-events: none; }
+.phase {
   background: #1c1c1c;
   color: var(--cream);
   border-radius: 999px;
@@ -182,7 +201,7 @@ body {
   <button id="auto" class="auto" type="button" aria-pressed="false" aria-label="Nach dem Schaffen automatisch neu starten"></button>
   <div class="best" id="best">Best --</div>
 </div>
-<div class="phase" id="phase">Warmup 1:00</div>
+<div class="toprow"><div class="phase" id="phase">Warmup 1:00</div><button class="newbtn" id="newbtn" type="button">&#8635; Neues Raster</button></div>
 <div class="timer" id="timer" aria-live="off">0.0s</div>
 <button class="again rs" id="again" type="button">&#8635; Reset</button>
 <button class="go" id="go" type="button" hidden>&#9654; Start Run</button>
@@ -275,12 +294,22 @@ body {
   }
 
   // Phasen
+  // Neues Raster: alles von vorne, Kacheln grau, erst "Start" lässt die Warmup-Minute laufen
   function newSession() {
     gen++;
-    mode = "warmup"; tries = [];
+    mode = "pre"; tries = [];
     buildGrid(); reset();
-    resultEl.hidden = true; goBtn.hidden = true; againBtn.hidden = false;
-    grid.classList.remove("off");
+    resultEl.hidden = true; againBtn.hidden = true;
+    goBtn.innerHTML = "&#9654; Start"; goBtn.hidden = false;
+    grid.classList.remove("off"); grid.classList.add("pre");
+    phaseEl.classList.remove("low");
+    phaseEl.textContent = "Warmup 1:00";
+  }
+  function startWarmup() {
+    if (mode !== "pre") return;
+    mode = "warmup";
+    grid.classList.remove("pre");
+    goBtn.hidden = true; againBtn.hidden = false;
     warmEnd = performance.now() + WARMUP * 1000;
     clockLoop();
   }
@@ -300,7 +329,7 @@ body {
     reset();
     phaseEl.classList.remove("low");
     phaseEl.textContent = "Warmup vorbei";
-    againBtn.hidden = true; goBtn.hidden = false;
+    againBtn.hidden = true; goBtn.innerHTML = "&#9654; Start Run"; goBtn.hidden = false;
     grid.classList.add("off");
   }
   function startRun() {
@@ -330,7 +359,8 @@ body {
   againBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); if (mode === "warmup") reset(); });
   againBtn.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && mode === "warmup") { e.preventDefault(); reset(); } });
   timerEl.addEventListener("pointerdown", function () { if (!running && mode === "warmup") reset(); });
-  goBtn.addEventListener("click", function (e) { e.preventDefault(); startRun(); });
+  goBtn.addEventListener("click", function (e) { e.preventDefault(); if (mode === "pre") startWarmup(); else startRun(); });
+  document.getElementById("newbtn").addEventListener("click", function (e) { e.preventDefault(); newSession(); });
   document.getElementById("newgrid").addEventListener("click", function (e) { e.preventDefault(); newSession(); });
 
   newSession();
