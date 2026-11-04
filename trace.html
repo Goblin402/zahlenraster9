@@ -1,0 +1,440 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Trace</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Trace: Pfad auf dem Wabenfeld merken und vom Startpunkt aus nachziehen.
+   Maße aus dem Original-Video: Punktestand bei 26 % Höhe, Zeitbalken bei 36 %, Feldmitte bei 63 %. */
+:root {
+  --w: min(100vw, 46vh);
+  --font: "Syne", "Arial Black", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: linear-gradient(180deg, #7f63f2 0%, #7b5bf0 45%, #6b47de 100%);
+  background-color: #7b5bf0;
+  color: #fff;
+  font-family: var(--font);
+  font-weight: 800;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 6;
+}
+.bar button, .best {
+  background: rgba(30, 14, 70, 0.62);
+  color: #fff4e6;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5em 0.95em;
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:active { transform: scale(0.94); }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.score {
+  position: absolute;
+  left: 0; right: 0;
+  top: 26%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: calc(var(--w) * 0.135);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  z-index: 3;
+  pointer-events: none;
+}
+.timer {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  width: calc(var(--w) * 0.64);
+  height: calc(var(--w) * 0.026);
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: #bf8ff2;
+  overflow: hidden;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+}
+.timer.on { opacity: 1; }
+.timer i {
+  position: absolute; inset: 0;
+  border-radius: 999px;
+  background: #f5dd7e;
+  transform-origin: left center;
+}
+.dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 14, 60, 0.82);
+  z-index: 4;
+  display: none;
+  pointer-events: none;
+}
+.idle .dim { display: block; }
+.idle .score { z-index: 5; color: #c08a3a; }
+.hint {
+  position: absolute;
+  left: 0; right: 0;
+  top: 52%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: calc(var(--w) * 0.07);
+  line-height: 1.1;
+  z-index: 5;
+  pointer-events: none;
+  display: none;
+}
+.idle .hint { display: block; }
+.result {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 16, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  z-index: 7;
+}
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(11vw, 52px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button {
+  margin-top: 10px;
+  background: #3a3a3c;
+  color: #fff;
+  border: 2px solid #8a8a8e;
+  border-radius: 12px;
+  padding: 0.65em 1.6em;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="score" id="score">0</div>
+<div class="timer" id="timer"><i id="tfill"></i></div>
+<div class="dim"></div>
+<div class="hint">Merke dir den<br>Pfad. Dann<br>zeichne ihn nach.</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+
+<script>
+(function () {
+  // Aus dem Video gemessen:
+  // Runde k hat k+2 Strecken, jede richtig gezogene Strecke = 1 Punkt.
+  // Feldgröße: Runde 1-2 sieben Punkte, Runde 3-5 neunzehn, ab Runde 6 siebenunddreißig.
+  // Vorführung: Startpunkt 0,5 s, dann 0,28 s pro Strecke, danach 0,6 s stehen lassen.
+  // Zeit zum Nachziehen: 4,4 s + 0,5 s pro Strecke.
+  var DOT_ONLY = 0.5, SEG_T = 0.28, HOLD = 0.6, AFTER_OK = 0.7, FAIL_SHOW = 1.3;
+  var COL = { dot: "#d6a2f2", path: "#f7df6a", trace: "#f7f2e6", fail: "#ff8a4c", glow: "rgba(255, 190, 255, 0.16)" };
+
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var scoreEl = document.getElementById("score"), bestEl = document.getElementById("best");
+  var timerEl = document.getElementById("timer"), tfill = document.getElementById("tfill");
+  var resultEl = document.getElementById("result"), ptsEl = document.getElementById("pts"), recEl = document.getElementById("rec");
+
+  function ringsFor(round) { return round <= 2 ? 1 : round <= 5 ? 2 : 3; }
+  function segsFor(round) { return round + 2; }
+  function timeFor(n) { return 4.4 + 0.5 * n; }
+
+  // Wabenfeld: Achsenkoordinaten (q, r), Reihen waagerecht
+  var nodes = [], R = 1, sp = 0, cx = 0, cy = 0, W = 0, H = 0, dpr = 1;
+  function build(rings) {
+    R = rings; nodes = [];
+    for (var r = -R; r <= R; r++)
+      for (var q = -R; q <= R; q++)
+        if (Math.abs(q + r) <= R) nodes.push({ q: q, r: r });
+    layout();
+  }
+  function idx(q, r) {
+    for (var i = 0; i < nodes.length; i++) if (nodes[i].q === q && nodes[i].r === r) return i;
+    return -1;
+  }
+  var NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
+  function neigh(i) {
+    var n = nodes[i], out = [];
+    NB.forEach(function (d) { var j = idx(n.q + d[0], n.r + d[1]); if (j >= 0) out.push(j); });
+    return out;
+  }
+  function adjacent(a, b) { return neigh(a).indexOf(b) >= 0; }
+  function layout() {
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    var w = Math.min(W, H * 0.46);
+    // halbe Feldbreite: 31 % (7 Punkte) bzw. 35,5 % (19 / 37 Punkte)
+    var half = R === 1 ? 0.31 : 0.355;
+    sp = w * half / R;
+    cx = W / 2; cy = H * 0.63;
+    nodes.forEach(function (n) {
+      n.x = cx + sp * (n.q + n.r / 2);
+      n.y = cy + sp * (n.r * Math.sqrt(3) / 2);
+    });
+  }
+  window.addEventListener("resize", function () { layout(); });
+
+  // zufälliger Pfad ohne doppelte Punkte
+  function makePath(n) {
+    for (var tries = 0; tries < 400; tries++) {
+      var p = [Math.floor(Math.random() * nodes.length)], used = {};
+      used[p[0]] = 1;
+      while (p.length <= n) {
+        var c = neigh(p[p.length - 1]).filter(function (j) { return !used[j]; });
+        if (!c.length) break;
+        var nx = c[Math.floor(Math.random() * c.length)];
+        p.push(nx); used[nx] = 1;
+      }
+      if (p.length === n + 1) return p;
+    }
+    return null;
+  }
+
+  var state = "idle", phase = "", score = 0, best = 0, round = 0;
+  var path = [], prog = 0, t0 = 0, limit = 0, finger = null, active = null, failAt = -1, gen = 0;
+  try { best = parseInt(localStorage.getItem("trace-best"), 10) || 0; } catch (e) {}
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
+  function now() { return performance.now() / 1000; }
+
+  function idle() {
+    gen++;
+    state = "idle"; phase = ""; score = 0; round = 0;
+    scoreEl.textContent = "0";
+    resultEl.hidden = true;
+    timerEl.classList.remove("on");
+    build(1);
+    path = makePath(3); prog = 0; finger = null; active = null; failAt = -1;
+    phase = "preview";
+    document.body.classList.add("idle");
+  }
+  function start() {
+    state = "run";
+    document.body.classList.remove("idle");
+    nextRound();
+  }
+  function nextRound() {
+    round++;
+    build(ringsFor(round));
+    path = makePath(segsFor(round));
+    prog = 0; finger = null; active = null; failAt = -1;
+    phase = "show"; t0 = now();
+    timerEl.classList.remove("on");
+  }
+  function beginTrace() {
+    phase = "trace"; t0 = now(); limit = timeFor(path.length - 1);
+    tfill.style.transform = "scaleX(1)";
+    timerEl.classList.add("on");
+  }
+  function fail(at) {
+    if (phase !== "trace") return;
+    phase = "fail"; failAt = at; active = null;
+    timerEl.classList.remove("on");
+    later(finish, FAIL_SHOW * 1000);
+  }
+  function finish() {
+    state = "done";
+    var rec = score > best;
+    if (rec) {
+      best = score;
+      try { localStorage.setItem("trace-best", String(best)); } catch (e) {}
+      showBest();
+    }
+    recEl.hidden = !rec;
+    ptsEl.textContent = score + " Pts";
+    resultEl.hidden = false;
+  }
+  function roundDone() {
+    phase = "done"; active = null; finger = null;
+    timerEl.classList.remove("on");
+    later(nextRound, AFTER_OK * 1000);
+  }
+
+  // Eingabe
+  function hit(x, y, r) {
+    var bestI = -1, bd = r * r;
+    for (var i = 0; i < nodes.length; i++) {
+      var dx = nodes[i].x - x, dy = nodes[i].y - y, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; bestI = i; }
+    }
+    return bestI;
+  }
+  function step(x, y) {
+    var j = hit(x, y, sp * 0.36);
+    if (j < 0 || j === path[prog]) return true;
+    if (prog > 0 && j === path[prog - 1]) return true;  // zurück auf den letzten Punkt: ignorieren
+    if (!adjacent(path[prog], j)) return true;            // nur Nachbarn zählen
+    if (j === path[prog + 1]) {
+      prog++; score++; scoreEl.textContent = score;
+      if (prog === path.length - 1) { roundDone(); return false; }
+      return true;
+    }
+    fail(j);
+    return false;
+  }
+  function move(x, y) {
+    if (phase !== "trace" || !active) return;
+    // Zwischenschritte, damit schnelle Bewegungen keinen Punkt überspringen
+    var lx = active.x, ly = active.y;
+    var dist = Math.hypot(x - lx, y - ly), n = Math.max(1, Math.ceil(dist / (sp * 0.15)));
+    for (var k = 1; k <= n; k++) {
+      if (!step(lx + (x - lx) * k / n, ly + (y - ly) * k / n)) return;
+    }
+    active.x = x; active.y = y; finger = { x: x, y: y };
+  }
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (state === "idle") { start(); return; }
+    if (phase !== "trace") return;
+    var j = hit(e.clientX, e.clientY, sp * 0.5);
+    if (j !== path[prog]) return;
+    active = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    finger = { x: e.clientX, y: e.clientY };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!active || e.pointerId !== active.id) return;
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!evs.length) evs = [e];
+    for (var i = 0; i < evs.length && active; i++) move(evs[i].clientX, evs[i].clientY);
+  });
+  function up(e) { if (active && e.pointerId === active.id) { active = null; finger = null; } }
+  cv.addEventListener("pointerup", up);
+  cv.addEventListener("pointercancel", up);
+  document.addEventListener("pointerdown", function (e) {
+    if (state !== "idle") return;
+    if (e.target.closest(".bar") || e.target.closest(".result")) return;
+    e.preventDefault();
+    start();
+  });
+
+  // Zeichnen
+  function line(pts, col, wdt) {
+    if (pts.length < 2) return;
+    ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+  }
+  function dot(x, y, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+  function P(i) { return nodes[i]; }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, sp * (R + 0.9));
+    gr.addColorStop(0, COL.glow); gr.addColorStop(1, "rgba(255, 190, 255, 0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, sp * (R + 0.9), 0, Math.PI * 2); ctx.fill();
+
+    var rd = sp * 0.125, rn = sp * 0.165, rs = sp * 0.185, lw = sp * 0.13;
+    var onPath = {};
+    nodes.forEach(function (n, i) { dot(n.x, n.y, rd, COL.dot); });
+    if (!path) return;
+
+    if (phase === "preview") { dot(P(path[0]).x, P(path[0]).y, rs, COL.trace); return; }
+
+    if (phase === "show") {
+      var t = now() - t0, segs = path.length - 1;
+      var drawn = Math.max(0, Math.min(segs, (t - DOT_ONLY) / SEG_T));
+      var full = Math.floor(drawn), pts = [];
+      for (var i = 0; i <= full; i++) pts.push(P(path[i]));
+      if (full < segs) {
+        var a = P(path[full]), b = P(path[full + 1]), f = drawn - full;
+        pts.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+      }
+      line(pts, COL.path, lw);
+      for (var k = 1; k <= full; k++) dot(P(path[k]).x, P(path[k]).y, rn, COL.path);
+      dot(P(path[0]).x, P(path[0]).y, rs, COL.path);
+      if (t > DOT_ONLY + segs * SEG_T + HOLD) beginTrace();
+      return;
+    }
+
+    if (phase === "trace" || phase === "done") {
+      var tp = [];
+      for (var m = 0; m <= prog; m++) tp.push(P(path[m]));
+      if (phase === "trace" && finger) tp.push(finger);
+      line(tp, COL.trace, lw);
+      for (var m2 = 1; m2 <= prog; m2++) dot(P(path[m2]).x, P(path[m2]).y, rn, COL.trace);
+      dot(P(path[0]).x, P(path[0]).y, rs, COL.trace);
+      if (phase === "trace") {
+        var left = 1 - (now() - t0) / limit;
+        tfill.style.transform = "scaleX(" + Math.max(0, left) + ")";
+        if (left <= 0) fail(-1);
+      }
+      return;
+    }
+
+    if (phase === "fail") {
+      var fp = path.map(P);
+      line(fp, COL.fail, lw);
+      for (var q = 1; q < fp.length; q++) dot(fp[q].x, fp[q].y, rn, COL.fail);
+      dot(fp[0].x, fp[0].y, rs, COL.fail);
+      if (failAt >= 0) dot(P(failAt).x, P(failAt).y, rn, COL.trace);
+    }
+  }
+  function frame() {
+    if (state !== "done" || phase === "fail") draw();
+    requestAnimationFrame(frame);
+  }
+
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), idle);
+  bindTap(document.getElementById("ok"), idle);
+
+  idle();
+  requestAnimationFrame(frame);
+  window.__trace = {
+    get s() { return { state: state, phase: phase, score: score, round: round, prog: prog, n: nodes.length, path: path.slice(), xy: path.map(function (i) { return [nodes[i].x, nodes[i].y]; }) }; }
+  };
+})();
+</script>
+
+</body></html>
