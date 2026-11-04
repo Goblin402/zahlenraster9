@@ -89,7 +89,8 @@ h1{font-size:28px;margin:8px 0 20px}
     } catch (e) {}
   });
   function open(g) {
-    frame.src = g + ".html";
+    // ?t=… umgeht den Zwischenspeicher, damit immer die neueste Version eines Spiels geladen wird
+    frame.src = g + ".html?t=" + Date.now();
     stage.hidden = false;
     try { history.replaceState(null, "", "#" + g); } catch (e) {}
     setTimeout(function () { try { frame.focus(); } catch (e) {} }, 50);

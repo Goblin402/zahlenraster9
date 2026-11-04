@@ -244,6 +244,7 @@ body {
   // Reaktion unter 150 ms ist nicht möglich (geraten): Run wird gewertet, zählt aber nicht für den Highscore.
   var MIN_RT = 150, BEST_KEY = "react-best-v2";
   var state = "idle", round = 0, litIdx = -1, litAt = 0, penalty = 0, times = [], pens = [], raws = [], gen = 0, best = null;
+  try { localStorage.removeItem("react-best"); } catch (e) {}   // alte Bestwerte (vor der 150-ms-Regel) löschen
   try { var s = parseFloat(localStorage.getItem(BEST_KEY)); if (s > 0) best = s; } catch (e) {}
   function showBest() { bestEl.innerHTML = "<b>Best &Oslash;</b>" + (best ? Math.round(best) + " ms" : "--"); }
   showBest();
