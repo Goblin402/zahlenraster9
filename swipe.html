@@ -67,6 +67,28 @@ body {
 .bar button:active { transform: scale(0.94); }
 .bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
+.modebox {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  width: 38px; height: 38px;
+  padding: 0;
+  border: 2px solid rgba(255, 244, 230, 0.35);
+  border-radius: 11px;
+  background: rgba(30, 10, 45, 0.72);
+  z-index: 6;
+  cursor: pointer;
+}
+.modebox:active { transform: scale(0.92); }
+.modebox:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.m1 .modebox { background: #fff; border-color: #fff; }
+.m2 .modebox { background: #000; border-color: rgba(255, 255, 255, 0.55); }
+.box::after {
+  content: ""; position: absolute; inset: 0;
+  background: #ff2a2a; opacity: 0; pointer-events: none;
+}
+.m1 .box.miss::after, .m2 .box.miss::after { opacity: 0.88; }
+.hap { position: fixed; left: -40px; top: 0; width: 30px; height: 30px; opacity: 0; pointer-events: none; overflow: hidden; }
 .score {
   position: absolute;
   left: 0; right: 0;
@@ -205,6 +227,8 @@ body {
 .result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 </style>
 
+<button class="modebox" id="mode" type="button" aria-label="Modus"></button>
+<label class="hap" aria-hidden="true"><input type="checkbox" switch id="hapsw" tabindex="-1"></label>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -247,11 +271,27 @@ body {
     boxes.push({ el: el, svg: el.querySelector("svg"), fill: el.querySelector(".fill"), dir: "up", val: 1, shown: 1, factor: 1, low: false });
   }
 
-  var state = "idle", score = 0, best = 0, gen = 0, last = 0;
-  try { best = parseInt(localStorage.getItem("swipe-best"), 10) || 0; } catch (e) {}
+  var state = "idle", score = 0, best = 0, gen = 0, last = 0, mode = 0;
+  var BEST_KEYS = ["swipe-best", "swipe-best-w", "swipe-best-b"];
+  try { mode = parseInt(localStorage.getItem("swipe-mode"), 10) || 0; } catch (e) {}
+  if (mode < 0 || mode > 2) mode = 0;
+  function loadBest() { best = 0; try { best = parseInt(localStorage.getItem(BEST_KEYS[mode]), 10) || 0; } catch (e) {} }
+  function applyMode() {
+    document.body.classList.remove("m0", "m1", "m2");
+    document.body.classList.add("m" + mode);
+    loadBest(); showBest();
+  }
+  // Haptik: Android per Vibration API, iPhone nur über den versteckten Schalter (kurzes Ticken)
+  var hapSw = document.getElementById("hapsw"), hapLabel = hapSw.parentNode;
+  function tick() { try { hapLabel.click(); } catch (e) {} }
+  function buzz(long) {
+    if (mode === 0) return;
+    if (typeof navigator.vibrate === "function") { try { navigator.vibrate(long ? 350 : 12); } catch (e) {} return; }
+    tick();
+    if (long) { setTimeout(tick, 70); setTimeout(tick, 140); setTimeout(tick, 210); setTimeout(tick, 280); }
+  }
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
-  showBest();
-
+  
   function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
   function setDir(b, d) {
     b.dir = d;
@@ -286,7 +326,7 @@ body {
     var rec = score > best;
     if (rec) {
       best = score;
-      try { localStorage.setItem("swipe-best", String(best)); } catch (e) {}
+      try { localStorage.setItem(BEST_KEYS[mode], String(best)); } catch (e) {}
       showBest();
     }
     recEl.hidden = !rec;
@@ -303,10 +343,13 @@ body {
       b.el.classList.remove("pop");
       void b.el.offsetWidth;
       b.el.classList.add("pop");
+      buzz(false);
     } else {
       b.el.classList.add("miss");
+      buzz(true);
+      if (mode === 2) { finish(); return; }
       var g = gen;
-      setTimeout(function () { if (g === gen) b.el.classList.remove("miss"); }, 140);
+      setTimeout(function () { if (g === gen) b.el.classList.remove("miss"); }, mode ? 260 : 140);
     }
   }
 
@@ -365,7 +408,7 @@ body {
 
   document.addEventListener("pointerdown", function (e) {
     if (state !== "idle") return;
-    if (e.target.closest(".bar") || e.target.closest(".result")) return;
+    if (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest(".modebox")) return;
     e.preventDefault();
     start();
   });
@@ -384,6 +427,16 @@ body {
   bindTap(document.getElementById("reset"), idle);
   bindTap(document.getElementById("ok"), idle);
 
+  document.getElementById("mode").addEventListener("pointerdown", function (e) { e.stopPropagation(); });
+  bindTap(document.getElementById("mode"), function () {
+    mode = (mode + 1) % 3;
+    try { localStorage.setItem("swipe-mode", String(mode)); } catch (e) {}
+    applyMode();
+    idle();
+    buzz(false);
+  });
+
+  applyMode();
   idle();
   window.__swipe = { get s() { return { state: state, score: score, vals: boxes.map(function (b) { return +b.val.toFixed(3); }), dirs: boxes.map(function (b) { return b.dir; }) }; } };
 })();
