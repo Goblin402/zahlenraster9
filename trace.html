@@ -174,7 +174,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   // Vorführung: Startpunkt 0,5 s, dann 0,28 s pro Strecke, danach 0,6 s stehen lassen.
   // Zeit zum Nachziehen: 4,4 s + 0,5 s pro Strecke.
   var DOT_ONLY = 0.5, SEG_T = 0.28, HOLD = 0.6, AFTER_OK = 0.7, FAIL_SHOW = 1.3;
-  var COL = { dot: "#d6a2f2", path: "#f7df6a", trace: "#f7f2e6", fail: "#ff8a4c", glow: "rgba(255, 190, 255, 0.16)" };
+  var COL = { dot: "#d6a2f2", path: "#f7df6a", trace: "#ffffff", fail: "#ff8a4c", glow: "rgba(255, 190, 255, 0.16)" };
 
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
   var scoreEl = document.getElementById("score"), bestEl = document.getElementById("best");
@@ -308,13 +308,18 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     return bestI;
   }
   // Fangradius: nächster richtiger Punkt großzügig, falsche Punkte nur bei klarem Treffer
-  var HIT_OK = 0.58, HIT_BAD = 0.27;
+  var HIT_OK = 0.58, HIT_BAD = 0.27, HIT_GRAB = 0.95, GRACE = 0.3;
   function step(x, y) {
     var nx = path[prog + 1], nd = nodes[nx];
     if (Math.hypot(nd.x - x, nd.y - y) < sp * HIT_OK) {
       prog++; score++; scoreEl.textContent = score;
       if (prog === path.length - 1) { roundDone(); return false; }
       return true;
+    }
+    // direkt nach dem Aufsetzen keine Fehler werten, bis sich der Finger etwas bewegt hat
+    if (active && !active.free) {
+      if (Math.hypot(x - active.dx, y - active.dy) < sp * GRACE) return true;
+      active.free = true;
     }
     var j = hit(x, y, sp * HIT_BAD);
     if (j < 0 || j === path[prog]) return true;
@@ -342,9 +347,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     e.preventDefault();
     if (state === "idle") { start(); return; }
     if (phase !== "trace") return;
-    var j = hit(e.clientX, e.clientY, sp * 0.5);
-    if (j !== path[prog]) return;
-    active = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    // Start- bzw. letzter Punkt: großer Fangradius, damit Aufsetzen und Weiterziehen sicher klappt
+    var c = nodes[path[prog]];
+    if (Math.hypot(c.x - e.clientX, c.y - e.clientY) > sp * HIT_GRAB) return;
+    active = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: e.clientX, dy: e.clientY, free: false };
     finger = { x: e.clientX, y: e.clientY };
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
   });
