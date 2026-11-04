@@ -177,6 +177,8 @@ body {
 .lbl { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.8; }
 .avg { font-size: calc(var(--w) * 0.13); color: var(--lit); font-variant-numeric: tabular-nums; }
 .rec { color: var(--lit); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.void { color: #ff7a6b; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; }
+.void[hidden] { display: none; }
 .result button {
   margin-top: 6px;
   background: var(--lit);
@@ -209,6 +211,7 @@ body {
   <div class="lbl">Durchschnitt</div>
   <div class="avg" id="avg">0 ms</div>
   <div class="rec" id="rec" hidden>Neue Bestzeit</div>
+  <div class="void" id="void" hidden>Zählt nicht – zu schnell (unter 150 ms)</div>
   <button id="again" type="button">&#8635; Nochmal</button>
 </div>
 
@@ -238,8 +241,10 @@ body {
     })(i);
   }
 
-  var state = "idle", round = 0, litIdx = -1, litAt = 0, penalty = 0, times = [], pens = [], gen = 0, best = null;
-  try { var s = parseFloat(localStorage.getItem("react-best")); if (s > 0) best = s; } catch (e) {}
+  // Reaktion unter 150 ms ist nicht möglich (geraten): Run wird gewertet, zählt aber nicht für den Highscore.
+  var MIN_RT = 150, BEST_KEY = "react-best-v2";
+  var state = "idle", round = 0, litIdx = -1, litAt = 0, penalty = 0, times = [], pens = [], raws = [], gen = 0, best = null;
+  try { var s = parseFloat(localStorage.getItem(BEST_KEY)); if (s > 0) best = s; } catch (e) {}
   function showBest() { bestEl.innerHTML = "<b>Best &Oslash;</b>" + (best ? Math.round(best) + " ms" : "--"); }
   showBest();
 
@@ -290,7 +295,7 @@ body {
     if ((state === "lit" || state === "lighting") && idx === litIdx) {
       var now = performance.now();
       var rt = (now - litAt) + penalty;
-      times.push(rt); pens.push(penalty);
+      times.push(rt); pens.push(penalty); raws.push(now - litAt);
       state = "show";
       var c = circles[idx];
       c.classList.remove("lit");
@@ -316,10 +321,12 @@ body {
       rowsEl.appendChild(a); rowsEl.appendChild(b);
     });
     var avg = sum / times.length;
-    var rec = !best || avg < best;
+    var tooFast = raws.some(function (r) { return r < MIN_RT; });
+    document.getElementById("void").hidden = !tooFast;
+    var rec = !tooFast && (!best || avg < best);
     if (rec) {
       best = avg;
-      try { localStorage.setItem("react-best", String(avg)); } catch (e) {}
+      try { localStorage.setItem(BEST_KEY, String(avg)); } catch (e) {}
       showBest();
     }
     recEl.hidden = !rec;
@@ -336,7 +343,7 @@ body {
   function idle() {
     gen++;
     state = "idle";
-    round = 0; times = []; pens = []; penalty = 0; litIdx = -1;
+    round = 0; times = []; pens = []; raws = []; penalty = 0; litIdx = -1;
     clearCircles();
     resultEl.hidden = true;
     stage.classList.add("intro");
