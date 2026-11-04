@@ -154,11 +154,11 @@ body {
 
 <script>
 (function () {
-  // Im Original gemessen: 12,6 s / 8,3 s / 6,45 s. Hier zufällig in einem Rahmen um diese Werte,
-  // jedes Level kürzer als das vorige. Der Balken blendet ab 70 % Restfüllung aus und ist bei 47 % ganz weg.
-  var RANGES = [[10, 15], [7, 10.5], [5, 8]], DUR = [12.6, 8.3, 6.45], FADE_FROM = 0.70, FADE_TO = 0.47;
+  // Jede Runde zieht ihre Zeit aus demselben Topf: 5 bis 15 s (im Original gemessen: 12,6 / 8,3 / 6,45 s).
+  // Der Balken blendet ab 70 % Restfüllung aus und ist bei 47 % ganz weg.
+  var MIN_T = 5, MAX_T = 15, DUR = [12.6, 8.3, 6.45], FADE_FROM = 0.70, FADE_TO = 0.47;
   function rollDurations() {
-    DUR = RANGES.map(function (r) { return Math.round((r[0] + Math.random() * (r[1] - r[0])) * 100) / 100; });
+    DUR = [0, 1, 2].map(function () { return Math.round((MIN_T + Math.random() * (MAX_T - MIN_T)) * 100) / 100; });
   }
   var COLORS = { good: "#1ebe53", mid: "#f3930d", bad: "#e64040" };
   function colorFor(e) { return e < 0.3 ? COLORS.good : e < 1 ? COLORS.mid : COLORS.bad; }

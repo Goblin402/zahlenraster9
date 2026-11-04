@@ -50,8 +50,7 @@ h1{font-size:28px;margin:8px 0 20px}
 <div id="menu">
   <h1>Trainer</h1>
   <a href="zahlenraster.html" data-g="zahlenraster">Zahlenraster<small>1–16, mit Auto-Neustart</small></a>
-  <a href="zahlenraster2.html" data-g="zahlenraster2">Zahlenraster 2<small>1–16, neue Anordnung (4 · 1 · 14 · 10 …)</small></a>
-  <a href="zahlenraster9.html" data-g="zahlenraster9">Zahlenraster Abschnitte<small>Hälften, Viertel, 4 Viertel mit Pause</small></a>
+  <a href="zahlenraster-zufall.html" data-g="zahlenraster-zufall">Zahlenraster Zufall<small>Neues Raster, 1 Min Warmup, dann 5 Versuche</small></a>
   <a href="diceroll.html" data-g="diceroll">Dice Roll<small>4dice, 2die, num, 2+2</small></a>
   <a href="react.html" data-g="react">React<small>3×3 Reaktion, 5 Runden</small></a>
   <a href="zig.html" data-g="zig">Zig<small>Zickzack-Bahn, Tippen wechselt die Richtung</small></a>
@@ -106,7 +105,7 @@ h1{font-size:28px;margin:8px 0 20px}
   document.getElementById("home").addEventListener("click", function (e) { e.preventDefault(); close(); });
 
   // Highscores aus einem Code übernehmen. Zeiten (Zahlenraster, Dice Roll, React, Time's Up): kleiner ist besser, sonst größer.
-  var LOWER = /^(zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best|timesup-best)/;
+  var LOWER = /^(zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best|timesup-best|zrz-best)/;
   var imp = document.getElementById("imp"), impCode = document.getElementById("imp-code"), impMsg = document.getElementById("imp-msg");
   document.getElementById("imp-open").addEventListener("click", function () { impCode.value = ""; impMsg.textContent = ""; imp.hidden = false; });
   document.getElementById("imp-close").addEventListener("click", function () { imp.hidden = true; });
