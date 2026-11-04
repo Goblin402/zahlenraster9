@@ -29,8 +29,8 @@ h1{font-size:28px;margin:8px 0 20px}
 #menu a small{display:block;font:600 13px system-ui,sans-serif;opacity:.65;margin-top:4px}
 #stage{position:absolute;inset:0;background:#000;z-index:10}
 #stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
-/* zwischen den Knöpfen links (Modus-Box, 75, 9–16) und rechts (Reset/Best) in allen Spielen frei */
-#home{position:absolute;z-index:11;top:calc(12px + env(safe-area-inset-top,0px));left:max(104px,calc(50% - 73px));width:36px;height:36px;border-radius:50%;border:0;padding:0;background:rgba(0,0,0,.38);display:grid;place-items:center;cursor:pointer}
+/* Home-Knopf immer oben links in der Ecke; Knöpfe der Spiele, die dort lagen, werden beim Laden nach rechts geschoben */
+#home{position:absolute;z-index:11;top:calc(12px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));width:36px;height:36px;border-radius:50%;border:0;padding:0;background:rgba(0,0,0,.38);display:grid;place-items:center;cursor:pointer}
 #home:active{transform:scale(.9)}
 #home:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #home svg{width:16px;height:16px;opacity:.85}
@@ -79,6 +79,17 @@ h1{font-size:28px;margin:8px 0 20px}
 (function () {
   // Alle Spiele in einer App: Menü, Spiel im Vollbild-Rahmen, Knopf oben in der Mitte zurück ins Menü.
   var stage = document.getElementById("stage"), frame = document.getElementById("frame");
+  // Platz für den Home-Knopf: linke Knöpfe der Spiele rechts daneben setzen (nur in der Sammel-App)
+  var SHIFT = ".range, .fast, .modebox { left: max(64px, calc(env(safe-area-inset-left, 0px) + 48px)) !important; }" +
+              "body.la-shift { padding-top: 44px !important; }";
+  frame.addEventListener("load", function () {
+    try {
+      var d = frame.contentDocument;
+      if (!d || !d.head) return;
+      var st = d.createElement("style"); st.textContent = SHIFT; d.head.appendChild(st);
+      if (/la-cards/.test(frame.getAttribute("src") || "")) d.body.classList.add("la-shift");
+    } catch (e) {}
+  });
   function open(g) {
     frame.src = g + ".html";
     stage.hidden = false;
