@@ -34,6 +34,18 @@ h1{font-size:28px;margin:8px 0 20px}
 #home:active{transform:scale(.9)}
 #home:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #home svg{width:16px;height:16px;opacity:.85}
+#imp-open{display:block;width:100%;margin-top:8px;background:transparent;border:2px dashed #3a3a3a;color:var(--cream);opacity:.8;border-radius:16px;padding:14px;font:800 16px "Arial Black",system-ui,sans-serif;cursor:pointer}
+#imp{position:fixed;inset:0;z-index:20;background:rgba(5,5,5,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font:600 15px system-ui,-apple-system,sans-serif}
+#imp[hidden]{display:none}
+#imp, #imp *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#imp h2{font:800 22px "Arial Black",system-ui,sans-serif;margin:0}
+#imp p{margin:0;max-width:340px;opacity:.8;line-height:1.4}
+#imp textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #444;background:#1b1b1b;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#imp .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#imp button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#2c2c2c;color:#fff}
+#imp button.main{background:#f5d55a;color:#111}
+#imp button:focus-visible,#imp-open:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#imp-msg{min-height:1.4em;color:#9fe39a}
 </style>
 <div id="menu">
   <h1>Trainer</h1>
@@ -49,6 +61,14 @@ h1{font-size:28px;margin:8px 0 20px}
   <a href="flap.html" data-g="flap">Flap<small>Tippen, durch die Lücken fliegen</small></a>
   <a href="dangerwall.html" data-g="dangerwall">Dangerwall<small>Box zwischen Stachelwänden</small></a>
   <a href="la-cards.html" data-g="la-cards">LA Final Cards<small>Lineare Algebra, Lernkarten</small></a>
+  <button id="imp-open" type="button">Highscores übertragen</button>
+</div>
+<div id="imp" hidden role="dialog" aria-modal="true" aria-labelledby="imp-h">
+  <h2 id="imp-h">Highscores übertragen</h2>
+  <p>Im alten Spiel auf „Best“ lange drücken, Code kopieren und hier einfügen. Für jedes alte Symbol einmal wiederholen. Es wird immer der bessere Wert behalten.</p>
+  <textarea id="imp-code" placeholder="Code hier einfügen (TR1:…)" aria-label="Übertragungscode"></textarea>
+  <div class="row"><button id="imp-paste" type="button">Einfügen</button><button class="main" id="imp-go" type="button">Übernehmen</button><button id="imp-close" type="button">Schließen</button></div>
+  <div id="imp-msg" role="status"></div>
 </div>
 <div id="stage" hidden>
   <iframe id="frame" title="Spiel"></iframe>
@@ -73,6 +93,37 @@ h1{font-size:28px;margin:8px 0 20px}
     a.addEventListener("click", function (e) { e.preventDefault(); open(a.getAttribute("data-g")); });
   });
   document.getElementById("home").addEventListener("click", function (e) { e.preventDefault(); close(); });
+
+  // Highscores aus einem Code übernehmen. Zeiten (Zahlenraster, Dice Roll, React): kleiner ist besser, sonst größer.
+  var LOWER = /^(zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best)/;
+  var imp = document.getElementById("imp"), impCode = document.getElementById("imp-code"), impMsg = document.getElementById("imp-msg");
+  document.getElementById("imp-open").addEventListener("click", function () { impCode.value = ""; impMsg.textContent = ""; imp.hidden = false; });
+  document.getElementById("imp-close").addEventListener("click", function () { imp.hidden = true; });
+  document.getElementById("imp-paste").addEventListener("click", function () {
+    try { navigator.clipboard.readText().then(function (t) { impCode.value = t; }, function () { impCode.focus(); }); } catch (e) { impCode.focus(); }
+  });
+  document.getElementById("imp-go").addEventListener("click", function () {
+    var raw = impCode.value.trim(), data;
+    try {
+      if (raw.indexOf("TR1:") !== 0) throw 0;
+      data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(4)))));
+    } catch (e) { impMsg.style.color = "#ff8a8a"; impMsg.textContent = "Code nicht erkannt. Bitte komplett kopieren."; return; }
+    var taken = 0, kept = 0;
+    Object.keys(data).forEach(function (k) {
+      var nv = data[k], ov = null;
+      try { ov = localStorage.getItem(k); } catch (e) {}
+      var take;
+      if (/best|^dr-total-|^dr-avg-/.test(k)) {
+        var n = parseFloat(nv), o = parseFloat(ov);
+        if (!(n > 0)) take = false;
+        else if (!(o > 0)) take = true;
+        else take = LOWER.test(k) ? n < o : n > o;
+      } else take = ov === null;   // Einstellungen nur übernehmen, wenn hier noch nichts gesetzt ist
+      if (take) { try { localStorage.setItem(k, nv); taken++; } catch (e) {} } else kept++;
+    });
+    impMsg.style.color = "#9fe39a";
+    impMsg.textContent = taken + " Werte übernommen" + (kept ? ", " + kept + " waren hier schon besser oder gleich" : "") + ".";
+  });
   var h = location.hash.replace("#", "");
   if (h && document.querySelector('#menu a[data-g="' + h + '"]')) open(h);
 })();
