@@ -1,0 +1,301 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Flap</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Flap: Tippen lässt den Ball springen, durch die Lücken fliegen, Ränder und Säulen nicht berühren.
+   Alle Maße und Werte aus der Bildschirmaufnahme (1170 x 2532) gemessen. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body {
+  background: #501790;
+  color: #fdf4ec;
+  font-family: var(--font);
+  font-weight: 800;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 6;
+}
+.bar button, .best {
+  background: rgba(20, 6, 40, 0.6);
+  color: #fff4e6;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5em 0.95em;
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:active { transform: scale(0.94); }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.hint {
+  position: absolute;
+  left: 0; right: 0;
+  top: 61%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: min(6.2vw, 30px);
+  line-height: 1.12;
+  z-index: 5;
+  pointer-events: none;
+  color: #fff;
+  display: none;
+}
+.idle .hint { display: block; }
+.result {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 16, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  z-index: 7;
+}
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(11vw, 52px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button {
+  margin-top: 10px;
+  background: #3a3a3c;
+  color: #fff;
+  border: 2px solid #8a8a8e;
+  border-radius: 12px;
+  padding: 0.65em 1.6em;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="hint">Tippe um den Ball<br>in der Luft zu<br>halten</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+
+<script>
+(function () {
+  // Weltmaße in Pixeln der Aufnahme bei 585 px Breite; Spielfeld innen 905 px hoch.
+  var FIELD_H = 905;
+  var TOP = 0.2607, BORDER = 0.0118;        // oberer Rand bei 26,1 % der Höhe, Randstärke 1,2 %
+  var GRAV = 1930, JUMP = -540, VMAX = 1600; // px/s², px/s
+  var BALL = 45.8, HIT_R = 18;              // Seitenlänge Quadrat, Trefferkreis (etwas kleiner als sichtbar)
+  var PILLAR_W = 77, SPACING = 404, FIRST = 725, MARGIN = 172;
+  var BALL_X = 253 / 585;                   // Ballposition in Bildschirmbreite
+  function gapFor(i) { return Math.max(150, 293 - 4.85 * i); }
+  function speedFor(s) { return Math.min(620, 288 + 5.36 * s); }
+  var COL = { bg: "#501790", pink: "#ec5e78", ball: "#fdf4ec", dim: "rgba(26, 9, 41, 0.97)", idleRim: "#3f1c22", idleScore: "#3a3a3a", idleBall: "#4a4a4e" };
+
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var bestEl = document.getElementById("best"), resultEl = document.getElementById("result");
+  var ptsEl = document.getElementById("pts"), recEl = document.getElementById("rec");
+
+  var Ws, Hs, dpr, k, fieldTop, border, worldW, ballSX;
+  function layout() {
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    Ws = window.innerWidth; Hs = window.innerHeight;
+    cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr);
+    border = Hs * BORDER;
+    fieldTop = Hs * TOP + border;                      // Innenkante oben
+    var fieldH = Hs - fieldTop - border;               // bis Innenkante unten
+    k = Math.min(Ws / 585, fieldH / FIELD_H);
+    worldW = Ws / k;
+    ballSX = Ws * BALL_X;
+  }
+  window.addEventListener("resize", layout);
+  layout();
+  function fieldHWorld() { return (Hs - fieldTop - border) / k; }
+
+  var state = "idle", score = 0, best = 0, gen = 0;
+  var by = 0, vy = 0, pillars = [], nextIndex = 0, last = 0;
+  try { best = parseInt(localStorage.getItem("flap-best"), 10) || 0; } catch (e) {}
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
+
+  function spawn(x) {
+    var fh = fieldHWorld(), g = gapFor(nextIndex);
+    var lo = MARGIN + g / 2, hi = fh - MARGIN - g / 2;
+    var c = hi > lo ? lo + Math.random() * (hi - lo) : fh / 2;
+    pillars.push({ x: x, top: c - g / 2, bot: c + g / 2, passed: false });
+    nextIndex++;
+  }
+  function idle() {
+    gen++;
+    state = "idle"; score = 0;
+    resultEl.hidden = true;
+    by = 0.47 * fieldHWorld(); vy = 0;
+    pillars = []; nextIndex = 0;
+    document.body.classList.add("idle");
+  }
+  function start() {
+    state = "run";
+    document.body.classList.remove("idle");
+    var bx = ballSX / k;
+    spawn(bx + FIRST);
+    last = performance.now();
+  }
+  function flap() {
+    if (state === "idle") start();
+    if (state !== "run") return;
+    vy = JUMP;
+  }
+  function die() {
+    state = "dead";
+    var rec = score > best;
+    if (rec) {
+      best = score;
+      try { localStorage.setItem("flap-best", String(best)); } catch (e) {}
+      showBest();
+    }
+    recEl.hidden = !rec;
+    later(function () { ptsEl.textContent = score + " Pts"; resultEl.hidden = false; state = "done"; }, 900);
+  }
+
+  function hitsRect(cx, cy, r, x0, y0, x1, y1) {
+    var nx = Math.max(x0, Math.min(cx, x1)), ny = Math.max(y0, Math.min(cy, y1));
+    var dx = cx - nx, dy = cy - ny;
+    return dx * dx + dy * dy < r * r;
+  }
+  function physics(dt) {
+    var fh = fieldHWorld(), bx = ballSX / k, sp = speedFor(score);
+    vy = Math.min(VMAX, vy + GRAV * dt);
+    by += vy * dt;
+    for (var i = 0; i < pillars.length; i++) pillars[i].x -= sp * dt;
+    var lastP = pillars[pillars.length - 1];
+    if (lastP && lastP.x < worldW + 40) spawn(lastP.x + SPACING);
+    while (pillars.length && pillars[0].x + PILLAR_W < -20) pillars.shift();
+    // Ränder
+    if (by - HIT_R < 0 || by + HIT_R > fh) { by = Math.max(HIT_R, Math.min(fh - HIT_R, by)); die(); return; }
+    for (var j = 0; j < pillars.length; j++) {
+      var p = pillars[j];
+      if (hitsRect(bx, by, HIT_R, p.x, -50, p.x + PILLAR_W, p.top) ||
+          hitsRect(bx, by, HIT_R, p.x, p.bot, p.x + PILLAR_W, fh + 50)) { die(); return; }
+      if (!p.passed && p.x + PILLAR_W < bx) { p.passed = true; score++; }
+    }
+  }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var idleNow = state === "idle";
+    ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, Ws, Hs);
+    // Säulen
+    ctx.fillStyle = COL.pink;
+    pillars.forEach(function (p) {
+      var x = p.x * k;
+      ctx.fillRect(x, fieldTop - 1, PILLAR_W * k, p.top * k + 1);
+      ctx.fillRect(x, fieldTop + p.bot * k, PILLAR_W * k, Hs - fieldTop - p.bot * k);
+    });
+    // Ränder
+    ctx.fillStyle = COL.pink;
+    ctx.fillRect(0, fieldTop - border, Ws, border);
+    ctx.fillRect(0, Hs - border, Ws, border);
+    // Punktestand
+    var scoreY = fieldTop + 41.5 * k;
+    ctx.font = "800 " + Math.round(79 * k) + "px " + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    // Ball
+    var cy = fieldTop + by * k, s = BALL * k;
+    var rot = Math.max(-30, Math.min(25, 16 - 0.058 * vy)) * Math.PI / 180;
+    if (idleNow) {
+      ctx.fillStyle = COL.dim; ctx.fillRect(0, fieldTop - border, Ws, Hs - fieldTop + border);
+      ctx.fillStyle = COL.idleRim;
+      ctx.fillRect(0, fieldTop - border, Ws, border); ctx.fillRect(0, Hs - border, Ws, border);
+      ctx.fillStyle = COL.idleScore; ctx.fillText("0", Ws / 2, scoreY);
+      ctx.save(); ctx.translate(ballSX, cy); ctx.fillStyle = COL.idleBall;
+      roundRect(-s / 2, -s / 2, s, s, s * 0.12); ctx.fill(); ctx.restore();
+      return;
+    }
+    ctx.save(); ctx.translate(ballSX, cy); ctx.rotate(-rot);
+    ctx.fillStyle = COL.ball; roundRect(-s / 2, -s / 2, s, s, s * 0.12); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = COL.ball; ctx.fillText(String(score), Ws / 2, scoreY);
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
+  function frame(t) {
+    if (state === "run") {
+      var dt = Math.min(0.05, (t - last) / 1000);
+      // feste Teilschritte, damit das Verhalten bei jeder Bildrate gleich ist
+      var n = Math.max(1, Math.ceil(dt / (1 / 240)));
+      for (var i = 0; i < n && state === "run"; i++) physics(dt / n);
+    }
+    last = t;
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  document.addEventListener("pointerdown", function (e) {
+    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result"))) return;
+    e.preventDefault();
+    flap();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" || e.key === "ArrowUp") { e.preventDefault(); flap(); }
+  });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), idle);
+  bindTap(document.getElementById("ok"), idle);
+
+  idle();
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+  window.__flap = {
+    get s() {
+      var bx = ballSX / k, p = null;
+      for (var i = 0; i < pillars.length; i++) if (pillars[i].x + PILLAR_W > bx - HIT_R) { p = pillars[i]; break; }
+      return { state: state, score: score, by: by, vy: vy, fh: fieldHWorld(), next: p && { x: p.x - bx, top: p.top, bot: p.bot } };
+    }
+  };
+})();
+</script>
+
+</body></html>
