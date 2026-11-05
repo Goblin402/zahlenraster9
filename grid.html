@@ -167,6 +167,7 @@ body {
   var COUNTS = [[4, 5], [5, 7], [8, 9], [9, 11], [9, 12], [12, 16]];
   var ANSWER_S = 9;           // Zeit zum Nachbauen
   var POP_S = 0.07;           // Felder erscheinen nacheinander
+  var SHOW_S = 2.05;          // danach ist das ganze Muster bis zu 2,05 s sichtbar (Tippen beendet es früher)
   function sizeFor(lv) { return SIZES[Math.min(lv, SIZES.length) - 1]; }
   function countFor(lv) {
     var r = lv <= COUNTS.length ? COUNTS[lv - 1] : [Math.min(20, 12 + (lv - 6) * 2), Math.min(22, 16 + (lv - 6) * 2)];
@@ -217,17 +218,20 @@ body {
     on.forEach(function (c) { pattern[c] = 1; });
     // Felder nacheinander aufleuchten lassen, dann kurz halten, dann ausblenden
     on.forEach(function (c, i) { later(function () { cells[c].classList.add("lit"); }, 250 + i * POP_S * 1000); });
-    var hold = 900 + k * 40;
-    later(function () {
-      cells.forEach(function (c) { c.classList.remove("lit"); });
-      state = "answer";
-      okBtn.classList.add("on");
-      timerEl.classList.add("on");
-      t0 = performance.now();
-    }, 250 + k * POP_S * 1000 + hold);
+    later(beginAnswer, 250 + (k - 1) * POP_S * 1000 + SHOW_S * 1000);
+  }
+  function beginAnswer() {
+    if (state !== "show") return;
+    gen++;   // noch ausstehende Aufleucht-Schritte verwerfen
+    cells.forEach(function (c) { c.classList.remove("lit"); });
+    state = "answer";
+    okBtn.classList.add("on");
+    timerEl.classList.add("on");
+    t0 = performance.now();
   }
   function toggle(i) {
     if (state === "idle") { startLevel(); return; }
+    if (state === "show") beginAnswer();   // früher anfangen: Muster verschwindet sofort, der Tipp zählt schon
     if (state !== "answer") return;
     if (picked[i]) { delete picked[i]; cells[i].classList.remove("sel"); }
     else { picked[i] = 1; cells[i].classList.add("sel"); }
