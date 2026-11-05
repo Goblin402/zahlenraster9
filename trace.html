@@ -40,6 +40,20 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.fast {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 4px; margin: -4px;
+  color: #fff; font: inherit; font-size: 14px; cursor: pointer;
+}
+.fast i { width: 24px; height: 24px; border: 2px solid #fff; border-radius: 7px; opacity: 0.55; box-sizing: border-box; }
+.fast span { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.fast[aria-pressed="true"] i { background: #ffd850; border-color: #ffd850; opacity: 1; }
+.fast[aria-pressed="true"] span { opacity: 1; }
+.fast:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
 .bar {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top, 0px));
@@ -151,6 +165,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </style>
 
 <canvas id="cv"></canvas>
+<button class="fast" id="fast" type="button" aria-pressed="false" aria-label="Ab Level 4 starten"><i></i><span>4</span></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -239,7 +254,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   var state = "idle", phase = "", score = 0, best = 0, round = 0;
   var path = [], prog = 0, t0 = 0, limit = 0, finger = null, active = null, failAt = -1, gen = 0;
-  try { best = parseInt(localStorage.getItem("trace-best"), 10) || 0; } catch (e) {}
+  // Box oben links: Start ab schwererem Punkt, Score trotzdem ab 0, eigene Bestwertung
+  var HARD = 4, hard = false, hardBtn = document.getElementById("fast");
+  try { hard = localStorage.getItem("trace-hard") === "1"; } catch (e) {}
+  function bestKey() { return hard ? "trace-best-4" : "trace-best"; }
+  function loadBest() { try { best = parseInt(localStorage.getItem(bestKey()), 10) || 0; } catch (e) { best = 0; } }
+  hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+  loadBest();
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
   function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
@@ -247,7 +268,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   function idle() {
     gen++;
-    state = "idle"; phase = ""; score = 0; round = 0;
+    state = "idle"; phase = ""; score = 0; round = hard ? HARD - 1 : 0;
     scoreEl.textContent = "0";
     resultEl.hidden = true;
     timerEl.classList.remove("on");
@@ -287,7 +308,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     var rec = score > best;
     if (rec) {
       best = score;
-      try { localStorage.setItem("trace-best", String(best)); } catch (e) {}
+      try { localStorage.setItem(bestKey(), String(best)); } catch (e) {}
       showBest();
     }
     recEl.hidden = !rec;
@@ -385,7 +406,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   cv.addEventListener("pointercancel", up);
   document.addEventListener("pointerdown", function (e) {
     if (state !== "idle") return;
-    if (e.target.closest(".bar") || e.target.closest(".result")) return;
+    if (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest(".fast")) return;
     e.preventDefault();
     start();
   });
@@ -460,6 +481,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
 
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  hardBtn.addEventListener("click", function (e) {
+    e.preventDefault(); e.stopPropagation();
+    hard = !hard;
+    try { localStorage.setItem("trace-hard", hard ? "1" : "0"); } catch (e2) {}
+    hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+    loadBest(); showBest(); idle();
+  });
   bindTap(document.getElementById("reset"), idle);
   bindTap(document.getElementById("ok"), idle);
 

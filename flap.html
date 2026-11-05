@@ -35,6 +35,20 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.fast {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 4px; margin: -4px;
+  color: #fdf4ec; font: inherit; font-size: 14px; cursor: pointer;
+}
+.fast i { width: 24px; height: 24px; border: 2px solid #fdf4ec; border-radius: 7px; opacity: 0.55; box-sizing: border-box; }
+.fast span { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.fast[aria-pressed="true"] i { background: #ffd850; border-color: #ffd850; opacity: 1; }
+.fast[aria-pressed="true"] span { opacity: 1; }
+.fast:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
 .bar {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top, 0px));
@@ -104,6 +118,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </style>
 
 <canvas id="cv"></canvas>
+<button class="fast" id="fast" type="button" aria-pressed="false" aria-label="Mit Tempo und Lücken wie bei 25 Punkten starten"><i></i><span>25</span></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -151,13 +166,21 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   var state = "idle", score = 0, best = 0, gen = 0;
   var by = 0, vy = 0, pillars = [], nextIndex = 0, last = 0;
-  try { best = parseInt(localStorage.getItem("flap-best"), 10) || 0; } catch (e) {}
+  // Box oben links: Start ab schwererem Punkt, Score trotzdem ab 0, eigene Bestwertung
+  var HARD = 25, hard = false, hardBtn = document.getElementById("fast");
+  try { hard = localStorage.getItem("flap-hard") === "1"; } catch (e) {}
+  function bestKey() { return hard ? "flap-best-25" : "flap-best"; }
+  function loadBest() { try { best = parseInt(localStorage.getItem(bestKey()), 10) || 0; } catch (e) { best = 0; } }
+  hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+  var FIRST_HARD = 1150;   // im schweren Modus mehr Anlauf bis zur ersten Wand
+  function off() { return hard ? HARD : 0; }
+  loadBest();
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
   function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
 
   function spawn(x) {
-    var fh = fieldHWorld(), g = gapFor(nextIndex);
+    var fh = fieldHWorld(), g = gapFor(nextIndex + off());
     var lo = MARGIN + g / 2, hi = fh - MARGIN - g / 2;
     var c = hi > lo ? lo + Math.random() * (hi - lo) : fh / 2;
     pillars.push({ x: x, top: c - g / 2, bot: c + g / 2, passed: false });
@@ -175,7 +198,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     state = "run";
     document.body.classList.remove("idle");
     var bx = ballSX / k;
-    spawn(bx + FIRST);
+    spawn(bx + (hard ? FIRST_HARD : FIRST));
     last = performance.now();
   }
   function flap() {
@@ -188,7 +211,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     var rec = score > best;
     if (rec) {
       best = score;
-      try { localStorage.setItem("flap-best", String(best)); } catch (e) {}
+      try { localStorage.setItem(bestKey(), String(best)); } catch (e) {}
       showBest();
     }
     recEl.hidden = !rec;
@@ -201,7 +224,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     return dx * dx + dy * dy < r * r;
   }
   function physics(dt) {
-    var fh = fieldHWorld(), bx = ballSX / k, sp = speedFor(score);
+    var fh = fieldHWorld(), bx = ballSX / k, sp = speedFor(score + off());
     vy = Math.min(VMAX, vy + GRAV * dt);
     by += vy * dt;
     for (var i = 0; i < pillars.length; i++) pillars[i].x -= sp * dt;
@@ -275,7 +298,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
 
   document.addEventListener("pointerdown", function (e) {
-    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result"))) return;
+    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest(".fast"))) return;
     e.preventDefault();
     flap();
   });
@@ -283,6 +306,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (e.code === "Space" || e.key === "ArrowUp") { e.preventDefault(); flap(); }
   });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  hardBtn.addEventListener("click", function (e) {
+    e.preventDefault(); e.stopPropagation();
+    hard = !hard;
+    try { localStorage.setItem("flap-hard", hard ? "1" : "0"); } catch (e2) {}
+    hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+    loadBest(); showBest(); idle();
+  });
   bindTap(document.getElementById("reset"), idle);
   bindTap(document.getElementById("ok"), idle);
 

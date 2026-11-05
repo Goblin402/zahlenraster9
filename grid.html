@@ -44,6 +44,20 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
+.fast {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 4px; margin: -4px;
+  color: #ffe3c8; font: inherit; font-size: 14px; cursor: pointer;
+}
+.fast i { width: 24px; height: 24px; border: 2px solid #ffe3c8; border-radius: 7px; opacity: 0.55; box-sizing: border-box; }
+.fast span { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.fast[aria-pressed="true"] i { background: #ffd850; border-color: #ffd850; opacity: 1; }
+.fast[aria-pressed="true"] span { opacity: 1; }
+.fast:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
 .bar {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top, 0px));
@@ -140,6 +154,7 @@ body {
 .result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 </style>
 
+<button class="fast" id="fast" type="button" aria-pressed="false" aria-label="Ab Level 4 starten"><i></i><span>4</span></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -180,7 +195,13 @@ body {
   var resultEl = document.getElementById("result"), bestEl = document.getElementById("best");
 
   var state = "idle", level = 1, score = 0, n = 3, cells = [], pattern = {}, picked = {}, t0 = 0, gen = 0, best = 0;
-  try { best = parseInt(localStorage.getItem("grid-best"), 10) || 0; } catch (e) {}
+  // Box oben links: Start ab schwererem Punkt, Score trotzdem ab 0, eigene Bestwertung
+  var HARD = 4, hard = false, hardBtn = document.getElementById("fast");
+  try { hard = localStorage.getItem("grid-hard") === "1"; } catch (e) {}
+  function bestKey() { return hard ? "grid-best-4" : "grid-best"; }
+  function loadBest() { try { best = parseInt(localStorage.getItem(bestKey()), 10) || 0; } catch (e) { best = 0; } }
+  hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+  loadBest();
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
   function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
@@ -199,10 +220,10 @@ body {
   }
   function idle() {
     gen++;
-    state = "idle"; level = 1; score = 0;
-    scoreEl.textContent = "0"; levelEl.textContent = "Level 1";
+    state = "idle"; level = hard ? HARD : 1; score = 0;
+    scoreEl.textContent = "0"; levelEl.textContent = "Level " + level;
     resultEl.hidden = true; okBtn.classList.remove("on"); timerEl.classList.remove("on");
-    build(3);
+    build(sizeFor(level));
     document.body.classList.add("idle");
   }
   function startLevel() {
@@ -259,7 +280,7 @@ body {
   function finish() {
     state = "done";
     var rec = score > best;
-    if (rec) { best = score; try { localStorage.setItem("grid-best", String(best)); } catch (e) {} showBest(); }
+    if (rec) { best = score; try { localStorage.setItem(bestKey(), String(best)); } catch (e) {} showBest(); }
     document.getElementById("rec").hidden = !rec;
     document.getElementById("pts").textContent = score + " Pts";
     resultEl.hidden = false;
@@ -277,11 +298,18 @@ body {
 
   document.addEventListener("pointerdown", function (e) {
     if (state !== "idle") return;
-    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx"))) return;
+    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx") || e.target.closest(".fast"))) return;
     e.preventDefault();
     startLevel();
   });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  hardBtn.addEventListener("click", function (e) {
+    e.preventDefault(); e.stopPropagation();
+    hard = !hard;
+    try { localStorage.setItem("grid-hard", hard ? "1" : "0"); } catch (e2) {}
+    hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+    loadBest(); showBest(); idle();
+  });
   bindTap(okBtn, submit);
   bindTap(document.getElementById("reset"), idle);
   bindTap(document.getElementById("again"), idle);
