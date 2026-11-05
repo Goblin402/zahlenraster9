@@ -243,7 +243,7 @@ body {
   var CAM = { d: 14, h: 9.4, a: 3.8, ly: -0.6, fov: 40 };
   // Box oben links: Start mit Tempo wie bei 75 Punkten, Score trotzdem ab 0, eigene Bestwertung
   var BOOST = 75, fast = false, fastBtn = document.getElementById("fast");
-  var RUNWAY = 10;   // Länge des Anlaufs im 75er-Modus (Felder)
+  var RUNWAY = 4;    // Anlauf im 75er-Modus: nur etwas länger als beim normalen Start (Felder)
   try { fast = localStorage.getItem("zig-fast") === "1"; } catch (e) {}
   function bestKey() { return fast ? "zig-best-75" : "zig-best"; }
   function loadBest() { try { best = parseInt(localStorage.getItem(bestKey()), 10) || 0; } catch (e) { best = 0; } }
