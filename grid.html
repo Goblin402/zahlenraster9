@@ -1,0 +1,333 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Grid</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Grid: Muster leuchtet kurz auf, danach aus dem Gedächtnis nachtippen und mit "Okay!" bestätigen.
+   Werte aus den beiden Videos geschätzt (abgefilmt, daher Farben und Maße angenähert). */
+:root {
+  --font: "Syne", "Arial Black", system-ui, sans-serif;
+  --w: min(100vw, 46.2vh);
+  --bg: #15100e;
+  --off: #3a3333;
+  --lit: #b8e43c;
+  --sel: #ffa51b;
+  --bad: #ff3030;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: radial-gradient(ellipse at 50% 40%, #1f1714 0%, var(--bg) 70%);
+  background-color: var(--bg);
+  color: #fff;
+  font-family: var(--font);
+  font-weight: 800;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 6;
+}
+.bar button, .best {
+  background: #2a2120;
+  color: #ffe3c8;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5em 0.95em;
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:active { transform: scale(0.94); }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.timer {
+  position: absolute; left: 50%; top: 22.5%;
+  width: calc(var(--w) * 0.5); height: calc(var(--w) * 0.022);
+  transform: translateX(-50%);
+  border-radius: 999px; background: rgba(184, 228, 60, 0.18); overflow: hidden;
+  opacity: 0; pointer-events: none;
+}
+.timer.on { opacity: 1; }
+.timer i { position: absolute; inset: 0; background: var(--lit); border-radius: 999px; transform-origin: left center; }
+.score {
+  position: absolute; left: 0; right: 0; top: 29%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: calc(var(--w) * 0.12);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.level {
+  position: absolute; left: 0; right: 0; top: 34.3%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: calc(var(--w) * 0.045);
+  color: #ffd2b0;
+  pointer-events: none;
+}
+.grid {
+  position: absolute; left: 50%; top: 60%;
+  width: calc(var(--w) * 0.74); aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid; gap: calc(var(--w) * 0.012);
+}
+.cell {
+  border: 0; padding: 0; border-radius: calc(var(--w) * 0.012);
+  background: var(--off);
+  cursor: pointer;
+  transition: background-color 0.08s, box-shadow 0.08s;
+}
+.cell.lit { background: var(--lit); box-shadow: 0 0 calc(var(--w) * 0.03) rgba(184, 228, 60, 0.45); }
+.cell.sel { background: var(--sel); box-shadow: 0 0 calc(var(--w) * 0.03) rgba(255, 165, 27, 0.45); }
+.cell.bad { background: var(--bad); box-shadow: 0 0 calc(var(--w) * 0.03) rgba(255, 48, 48, 0.5); }
+.cell:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.ok {
+  position: absolute; left: 50%; top: 91%;
+  transform: translate(-50%, -50%);
+  width: calc(var(--w) * 0.42); height: calc(var(--w) * 0.12);
+  border: 0; border-radius: 999px;
+  background: var(--lit); color: #1d2a05;
+  font: inherit; font-size: calc(var(--w) * 0.05);
+  cursor: pointer;
+  display: none;
+}
+.ok.on { display: block; }
+.ok:active { transform: translate(-50%, -50%) scale(0.96); }
+.ok:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.dim { position: absolute; inset: 0; background: rgba(10, 7, 6, 0.86); z-index: 4; display: none; pointer-events: none; }
+.idle .dim { display: block; }
+.hint { position: absolute; left: 0; right: 0; top: 60%; transform: translateY(-50%); text-align: center; font-size: calc(var(--w) * 0.065); line-height: 1.12; z-index: 5; display: none; pointer-events: none; }
+.idle .hint { display: block; }
+.result {
+  position: absolute; inset: 0; z-index: 7;
+  background: rgba(10, 6, 6, 0.9);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center;
+}
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(11vw, 52px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: var(--lit); color: #1d2a05; border: 0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="timer" id="timer"><i id="tfill"></i></div>
+<div class="score" id="score">0</div>
+<div class="level" id="level">Level 1</div>
+<div class="grid" id="grid"></div>
+<button class="ok" id="ok" type="button">Okay!</button>
+<div class="dim"></div>
+<div class="hint">Merke dir das<br>Muster und stelle<br>es nach!</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="again" type="button">&#10003; OKAY</button>
+</div>
+
+<script>
+(function () {
+  // Aus den Videos: Level 1 = 3x3, Level 2 = 4x4, Level 3–4 = 5x5, ab Level 5 = 6x6.
+  // Leuchtende Felder je Level (gesehen: 4–5, 5–7, 8–9, 10, 9, ~16), danach weiter steigend.
+  // Punkte: jedes richtig getippte Feld zählt; ein Fehler beendet den Lauf (richtige Felder zählen trotzdem).
+  var SIZES = [3, 4, 5, 5, 6, 6];
+  var COUNTS = [[4, 5], [5, 7], [8, 9], [9, 11], [9, 12], [12, 16]];
+  var ANSWER_S = 9;           // Zeit zum Nachbauen
+  var POP_S = 0.07;           // Felder erscheinen nacheinander
+  function sizeFor(lv) { return SIZES[Math.min(lv, SIZES.length) - 1]; }
+  function countFor(lv) {
+    var r = lv <= COUNTS.length ? COUNTS[lv - 1] : [Math.min(20, 12 + (lv - 6) * 2), Math.min(22, 16 + (lv - 6) * 2)];
+    return r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1));
+  }
+
+  var gridEl = document.getElementById("grid"), okBtn = document.getElementById("ok");
+  var scoreEl = document.getElementById("score"), levelEl = document.getElementById("level");
+  var timerEl = document.getElementById("timer"), tfill = document.getElementById("tfill");
+  var resultEl = document.getElementById("result"), bestEl = document.getElementById("best");
+
+  var state = "idle", level = 1, score = 0, n = 3, cells = [], pattern = {}, picked = {}, t0 = 0, gen = 0, best = 0;
+  try { best = parseInt(localStorage.getItem("grid-best"), 10) || 0; } catch (e) {}
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
+
+  function build(size) {
+    n = size; gridEl.innerHTML = ""; cells = [];
+    gridEl.style.gridTemplateColumns = "repeat(" + n + ", 1fr)";
+    gridEl.style.gridTemplateRows = "repeat(" + n + ", 1fr)";
+    for (var i = 0; i < n * n; i++) {
+      var b = document.createElement("button");
+      b.className = "cell"; b.type = "button";
+      b.setAttribute("aria-label", "Feld " + (i + 1));
+      (function (idx) { b.addEventListener("pointerdown", function (e) { e.preventDefault(); toggle(idx); }); })(i);
+      gridEl.appendChild(b); cells.push(b);
+    }
+  }
+  function idle() {
+    gen++;
+    state = "idle"; level = 1; score = 0;
+    scoreEl.textContent = "0"; levelEl.textContent = "Level 1";
+    resultEl.hidden = true; okBtn.classList.remove("on"); timerEl.classList.remove("on");
+    build(3);
+    document.body.classList.add("idle");
+  }
+  function startLevel() {
+    state = "show";
+    document.body.classList.remove("idle");
+    levelEl.textContent = "Level " + level;
+    build(sizeFor(level));
+    var k = countFor(level), idx = [];
+    for (var i = 0; i < n * n; i++) idx.push(i);
+    for (var j = idx.length - 1; j > 0; j--) { var r = Math.floor(Math.random() * (j + 1)); var t = idx[j]; idx[j] = idx[r]; idx[r] = t; }
+    var on = idx.slice(0, k);
+    pattern = {}; picked = {};
+    on.forEach(function (c) { pattern[c] = 1; });
+    // Felder nacheinander aufleuchten lassen, dann kurz halten, dann ausblenden
+    on.forEach(function (c, i) { later(function () { cells[c].classList.add("lit"); }, 250 + i * POP_S * 1000); });
+    var hold = 900 + k * 40;
+    later(function () {
+      cells.forEach(function (c) { c.classList.remove("lit"); });
+      state = "answer";
+      okBtn.classList.add("on");
+      timerEl.classList.add("on");
+      t0 = performance.now();
+    }, 250 + k * POP_S * 1000 + hold);
+  }
+  function toggle(i) {
+    if (state === "idle") { startLevel(); return; }
+    if (state !== "answer") return;
+    if (picked[i]) { delete picked[i]; cells[i].classList.remove("sel"); }
+    else { picked[i] = 1; cells[i].classList.add("sel"); }
+  }
+  function submit() {
+    if (state !== "answer") return;
+    state = "check";
+    okBtn.classList.remove("on"); timerEl.classList.remove("on");
+    var hits = 0, wrong = false;
+    for (var i = 0; i < n * n; i++) {
+      if (picked[i] && pattern[i]) hits++;
+      if (!!picked[i] !== !!pattern[i]) wrong = true;
+    }
+    score += hits;
+    scoreEl.textContent = score;
+    if (!wrong) {
+      cells.forEach(function (c, i) { if (pattern[i]) { c.classList.remove("sel"); c.classList.add("lit"); } });
+      later(function () { level++; startLevel(); }, 700);
+    } else {
+      // Fehler: richtiges Muster rot zeigen, dann Ergebnis
+      cells.forEach(function (c, i) { c.classList.remove("sel", "lit"); if (pattern[i]) c.classList.add("bad"); });
+      later(finish, 1400);
+    }
+  }
+  function finish() {
+    state = "done";
+    var rec = score > best;
+    if (rec) { best = score; try { localStorage.setItem("grid-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = score + " Pts";
+    resultEl.hidden = false;
+  }
+
+  function frame() {
+    if (state === "answer") {
+      var left = 1 - (performance.now() - t0) / 1000 / ANSWER_S;
+      tfill.style.transform = "scaleX(" + Math.max(0, left) + ")";
+      if (left <= 0) submit();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  document.addEventListener("pointerdown", function (e) {
+    if (state !== "idle") return;
+    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx"))) return;
+    e.preventDefault();
+    startLevel();
+  });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(okBtn, submit);
+  bindTap(document.getElementById("reset"), idle);
+  bindTap(document.getElementById("again"), idle);
+
+  idle();
+  window.__grid = { get s() { return { state: state, level: level, score: score, n: n, pattern: Object.keys(pattern).map(Number) }; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
