@@ -239,11 +239,10 @@ body {
 
   var tiles = {}, list = [], pathLen = 0, head = null, lane = 0;
   var state = "idle", score = 0, best = 0, bx = 0, bz = 0, by = R, dir = "x", vy = 0, fallT = 0, gen = 0;
-  var camP = 0, camL = 0, now = 0;
+  var camP = 0, now = 0;
   var CAM = { d: 14, h: 9.4, a: 3.8, ly: -0.6, fov: 40 };
   // Box oben links: Start mit Tempo wie bei 75 Punkten, Score trotzdem ab 0, eigene Bestwertung
   var BOOST = 75, fast = false, fastBtn = document.getElementById("fast");
-  var RUNWAY = 4;    // Anlauf im 75er-Modus: nur etwas länger als beim normalen Start (Felder)
   try { fast = localStorage.getItem("zig-fast") === "1"; } catch (e) {}
   function bestKey() { return fast ? "zig-best-75" : "zig-best"; }
   function loadBest() { try { best = parseInt(localStorage.getItem(bestKey()), 10) || 0; } catch (e) { best = 0; } }
@@ -286,11 +285,6 @@ body {
     tiles = {}; list = []; pathLen = 0; lane = 0;
     for (var i = -1; i <= 1; i++) for (var j = -1; j <= 1; j++) addTile(i, j, 0, true);
     head = tiles[key(1, 1)];
-    // 75er-Modus: gerader Anlauf, damit man bei dem Tempo nicht sofort tippen muss
-    if (fast) {
-      for (var r = 2; r <= RUNWAY; r++) addTile(r, 0, 0, true);
-      head = tiles[key(RUNWAY, 0)];
-    }
     // die ersten Felder sofort sichtbar
     var keep = now; now = -10;
     while (pathLen < 12) {
@@ -308,7 +302,7 @@ body {
     score = 0;
     scoreEl.textContent = "0";
     bx = 0; bz = 0; by = R; vy = 0; dir = "x";
-    camP = 0; camL = 0;
+    camP = 0;
     build();
     extend();
     resultEl.hidden = true;
@@ -392,12 +386,8 @@ body {
     var p = (bx + bz) / 2;
     camP += (p - camP) * 0.12;
     if (state === "idle") camP = p;
-    // Seitlich: nur im 75er-Modus folgt die Kamera dem geraden Anlauf und bleibt danach auf der neuen Bahnmitte
-    var lt = fast ? (score === 0 ? Math.max(0, (bx - bz) / 2) : RUNWAY / 2) : 0;
-    camL += (lt - camL) * 0.15;
-    if (state === "idle") camL = 0;
     // Kamera schaut entlang der Diagonale (+x,+z) schraeg von oben
-    var tx = camP + camL + CAM.a, tz = camP - camL + CAM.a;
+    var tx = camP + CAM.a, tz = camP + CAM.a;
     camera.position.set(tx - CAM.d, CAM.h, tz - CAM.d);
     camera.lookAt(tx, CAM.ly, tz);
   }
