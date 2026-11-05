@@ -1,0 +1,358 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Firefly Garden</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Firefly Garden: Glühwürmchen fliegen den Mondstrahl herunter, Tippen schaltet die Weiche
+   zwischen türkiser (links) und gelber Blume (rechts). Maße aus der Bildschirmaufnahme (1170 x 2532). */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body {
+  background: #111a33;
+  color: #f3f2d4;
+  font-family: var(--font);
+  font-weight: 800;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 6;
+}
+.bar button, .best {
+  background: rgba(6, 10, 24, 0.6);
+  color: #fff4e6;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5em 0.95em;
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:active { transform: scale(0.94); }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.hint {
+  position: absolute; left: 0; right: 0; top: 40%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: min(6.6vw, 31px);
+  line-height: 1.12;
+  z-index: 5;
+  pointer-events: none;
+  color: #fff;
+  display: none;
+}
+.idle .hint { display: block; }
+.result {
+  position: absolute; inset: 0; z-index: 7;
+  background: rgba(6, 8, 16, 0.9);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center;
+}
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(11vw, 52px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="hint">Tippe, um den<br>Mondstrahl zu<br>wechseln</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+
+<script>
+(function () {
+  // Welt in Pixeln der Aufnahme bei 585 x 1266. Gemessen:
+  // Strahl x = 292, von y = 485 bis zur Weiche bei y = 770; Blumen bei (143 | 1092) türkis und (440 | 1092) gelb.
+  // Tempo auf dem Strahl 206 px/s am Anfang, +3,6 px/s pro Punkt; auf dem Bogen doppelt so schnell.
+  // Abstand zwischen zwei Glühwürmchen: 0,94 s am Anfang, -0,011 s pro Punkt (0,5 s bei 40).
+  var WW = 585, WH = 1266;
+  var BX = 292, TOPY = 485, SWY = 770, FL = { c: { x: 143, y: 1092 }, y: { x: 440, y: 1092 } };
+  var COL = { c: "#66d9c4", y: "#fed065", cGlow: "rgba(102, 217, 196, ", yGlow: "rgba(254, 208, 101, " };
+  function vSpeed(s) { return Math.min(560, 206 + 3.6 * s); }
+  function interval(s) { return Math.max(0.36, 0.94 - 0.011 * s); }
+
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var bestEl = document.getElementById("best"), resultEl = document.getElementById("result");
+  var Ws, Hs, dpr, k, ox, oy, stars = [];
+  function layout() {
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    Ws = window.innerWidth; Hs = window.innerHeight;
+    cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr);
+    k = Math.min(Ws / WW, Hs / WH);
+    ox = (Ws - WW * k) / 2; oy = Hs - WH * k;   // unten bündig, oben mehr Himmel bei hohen Bildschirmen
+  }
+  window.addEventListener("resize", layout);
+  layout();
+  for (var i = 0; i < 46; i++) stars.push({ x: Math.random() * WW, y: 430 + Math.random() * 640, r: 1 + Math.random() * 1.8, p: Math.random() * 6 });
+
+  var state = "idle", score = 0, best = 0, dir = "y", flies = [], spawnT = 0, last = 0, clock = 0, gen = 0, failAt = null;
+  try { best = parseInt(localStorage.getItem("firefly-best"), 10) || 0; } catch (e) {}
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
+
+  // Bogen von der Weiche zur Blume (quadratische Kurve)
+  function curvePt(side, u) {
+    var f = FL[side], cx = BX + (f.x - BX) * 0.15, cy = SWY + 120;
+    var a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u;
+    return { x: a * BX + b * cx + c * f.x, y: a * SWY + b * cy + c * (f.y - 30) };
+  }
+  var CURVE_LEN = { c: 0, y: 0 };
+  ["c", "y"].forEach(function (s) {
+    var L = 0, p = curvePt(s, 0);
+    for (var i = 1; i <= 40; i++) { var q = curvePt(s, i / 40); L += Math.hypot(q.x - p.x, q.y - p.y); p = q; }
+    CURVE_LEN[s] = L;
+  });
+
+  function idle() {
+    gen++;
+    state = "idle"; score = 0; dir = "y"; flies = []; failAt = null; clock = 0;
+    resultEl.hidden = true;
+    document.body.classList.add("idle");
+  }
+  function start() {
+    state = "run";
+    document.body.classList.remove("idle");
+    spawnT = 0; last = performance.now();
+  }
+  function tap() {
+    if (state === "idle") { start(); return; }
+    if (state !== "run") return;
+    dir = dir === "y" ? "c" : "y";
+  }
+  function fail(side) {
+    state = "fail"; failAt = { side: side, t: clock };
+    var rec = score > best;
+    if (rec) { best = score; try { localStorage.setItem("firefly-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    later(function () { document.getElementById("pts").textContent = score + " Pts"; resultEl.hidden = false; state = "done"; }, 1200);
+  }
+
+  function physics(dt) {
+    clock += dt;
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      flies.push({ col: Math.random() < 0.5 ? "c" : "y", y: TOPY, side: null, u: 0, t: clock });
+      spawnT += interval(score);
+    }
+    var v = vSpeed(score);
+    for (var i = flies.length - 1; i >= 0; i--) {
+      var f = flies[i];
+      if (!f.side) {
+        f.y += v * dt;
+        if (f.y >= SWY) { f.side = dir; f.u = (f.y - SWY) / CURVE_LEN[f.side]; }
+      } else {
+        f.u += v * 2 * dt / CURVE_LEN[f.side];
+        if (f.u >= 1) {
+          flies.splice(i, 1);
+          if (f.col === f.side) score++;
+          else { fail(f.side); return; }
+        }
+      }
+    }
+  }
+
+  function W(x) { return ox + x * k; }
+  function H(y) { return oy + y * k; }
+  function glow(x, y, r, rgba, a) {
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba + a + ")"); g.addColorStop(1, rgba + "0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  function flower(side) {
+    var f = FL[side], x = W(f.x), y = H(f.y), s = k;
+    // Stiel
+    ctx.strokeStyle = "#3e8a5c"; ctx.lineWidth = 7 * s; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x, y + 40 * s); ctx.quadraticCurveTo(x + 6 * s, y + 90 * s, x - 14 * s, y + 130 * s); ctx.stroke();
+    var petal = side === "c" ? "#5fd6c0" : "#fec94f", n = side === "c" ? 6 : 10, len = side === "c" ? 52 : 56, wid = side === "c" ? 26 : 17;
+    ctx.fillStyle = petal;
+    for (var i = 0; i < n; i++) {
+      var a = i / n * Math.PI * 2 + (side === "c" ? 0.52 : 0.2);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      ctx.beginPath(); ctx.ellipse(len * 0.55 * s, 0, len * 0.55 * s, wid * s, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = "#123232"; ctx.beginPath(); ctx.arc(x, y, 26 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = side === "c" ? "#c3fff0" : "#fff0a8"; ctx.beginPath(); ctx.arc(x, y, 19 * s, 0, Math.PI * 2); ctx.fill();
+  }
+  function fly(x, y, col, ang) {
+    var s = k;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    glow(0, 8 * s, 26 * s, col === "c" ? COL.cGlow : COL.yGlow, 0.35);
+    var flap = Math.sin(clock * 40) * 0.25;
+    ctx.fillStyle = "rgba(200, 206, 190, 0.92)";
+    ctx.save(); ctx.rotate(-0.25 + flap); ctx.beginPath(); ctx.ellipse(-17 * s, -2 * s, 17 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.rotate(0.25 - flap); ctx.beginPath(); ctx.ellipse(17 * s, -2 * s, 17 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = "#16212a"; ctx.beginPath(); ctx.ellipse(0, -9 * s, 6 * s, 9 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COL[col]; ctx.beginPath(); ctx.arc(0, 8 * s, 10 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col === "c" ? "#1d6e64" : "#8a4a2c"; ctx.beginPath(); ctx.arc(0, 8 * s, 3.2 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var g = ctx.createLinearGradient(0, 0, 0, Hs);
+    g.addColorStop(0, "#0e152c"); g.addColorStop(0.45, "#13213f"); g.addColorStop(0.75, "#122a40"); g.addColorStop(1, "#0d2224");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, Ws, Hs);
+    // Sterne / Pollen
+    stars.forEach(function (st) {
+      ctx.fillStyle = "rgba(170, 190, 220, " + (0.25 + 0.2 * Math.sin(clock * 1.3 + st.p)).toFixed(3) + ")";
+      ctx.beginPath(); ctx.arc(W(st.x), H(st.y), st.r * k, 0, Math.PI * 2); ctx.fill();
+    });
+    // Hügel
+    ctx.fillStyle = "#0c1e20";
+    ctx.beginPath(); ctx.moveTo(0, H(1150)); ctx.quadraticCurveTo(Ws * 0.5, H(1100), Ws, H(1150)); ctx.lineTo(Ws, Hs); ctx.lineTo(0, Hs); ctx.closePath(); ctx.fill();
+    // Punktestand mit Mondschein
+    glow(W(BX), H(410), 150 * k, "rgba(255, 240, 190, ", 0.10);
+    ctx.font = "800 " + Math.round(92 * k) + "px " + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = state === "idle" ? "#4a5060" : "#f3f2d4";
+    ctx.fillText(String(score), W(BX), H(385));
+    // Strahl senkrecht
+    var bw = 68 * k, sg = ctx.createLinearGradient(0, H(TOPY - 10), 0, H(SWY));
+    sg.addColorStop(0, "rgba(220, 230, 240, 0)"); sg.addColorStop(0.25, "rgba(220, 230, 240, 0.13)"); sg.addColorStop(1, "rgba(220, 230, 240, 0.16)");
+    ctx.fillStyle = sg; ctx.fillRect(W(BX) - bw / 2, H(TOPY - 10), bw, H(SWY) - H(TOPY - 10));
+    // Bogen zur aktiven Blume
+    var tint = dir === "c" ? COL.cGlow : COL.yGlow;
+    ctx.strokeStyle = tint + "0.16)"; ctx.lineWidth = bw; ctx.lineCap = "butt";
+    ctx.beginPath(); var p0 = curvePt(dir, 0); ctx.moveTo(W(p0.x), H(p0.y));
+    for (var i = 1; i <= 30; i++) { var q = curvePt(dir, i / 30); ctx.lineTo(W(q.x), H(q.y)); }
+    ctx.stroke();
+    // Blumen
+    flower("c"); flower("y");
+    // Weiche
+    glow(W(BX), H(SWY), 70 * k, tint, 0.35);
+    ctx.fillStyle = tint + "0.55)"; ctx.beginPath(); ctx.arc(W(BX), H(SWY), 38 * k, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = dir === "c" ? "#c8fff2" : "#fff1b8";
+    star(W(BX), H(SWY), 11 * k);
+    // Glühwürmchen
+    flies.forEach(function (f) {
+      if (!f.side) fly(W(BX), H(f.y), f.col, 0);
+      else {
+        var p = curvePt(f.side, Math.min(1, f.u)), q = curvePt(f.side, Math.min(1, f.u + 0.02));
+        fly(W(p.x), H(p.y), f.col, Math.atan2(q.y - p.y, q.x - p.x) - Math.PI / 2);
+      }
+    });
+    // Fehler: roter Ring an der Blume, Bild abdunkeln
+    if (failAt) {
+      ctx.fillStyle = "rgba(40, 10, 20, 0.35)"; ctx.fillRect(0, 0, Ws, Hs);
+      var fx = W(FL[failAt.side].x), fy = H(FL[failAt.side].y), pr = Math.min(1, (clock - failAt.t) / 0.25);
+      ctx.strokeStyle = "rgba(255, 60, 80, 0.9)"; ctx.lineWidth = 6 * k;
+      ctx.beginPath(); ctx.arc(fx, fy, 38 * k * (0.6 + 0.4 * pr), 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "rgba(255, 60, 80, 0.45)";
+      ctx.beginPath(); ctx.arc(fx, fy, 48 * k * (0.6 + 0.4 * pr), 0, Math.PI * 2); ctx.stroke();
+    }
+    if (state === "idle") { ctx.fillStyle = "rgba(8, 10, 20, 0.72)"; ctx.fillRect(0, 0, Ws, Hs); }
+  }
+  function star(x, y, r) {
+    ctx.beginPath();
+    for (var i = 0; i < 8; i++) { var a = i * Math.PI / 4, rr = i % 2 ? r * 0.32 : r; ctx.lineTo(x + Math.sin(a) * rr, y - Math.cos(a) * rr); }
+    ctx.closePath(); ctx.fill();
+  }
+
+  function frame(t) {
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (state === "run") { var n = Math.max(1, Math.ceil(dt / (1 / 240))); for (var i = 0; i < n && state === "run"; i++) physics(dt / n); }
+    else clock += dt;
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  document.addEventListener("pointerdown", function (e) {
+    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx"))) return;
+    e.preventDefault();
+    tap();
+  });
+  document.addEventListener("keydown", function (e) { if (e.code === "Space") { e.preventDefault(); tap(); } });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), idle);
+  bindTap(document.getElementById("ok"), idle);
+
+  idle();
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+  window.__ff = { get s() { return { state: state, score: score, dir: dir, flies: flies.map(function (f) { return { col: f.col, y: f.y, side: f.side }; }) }; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
