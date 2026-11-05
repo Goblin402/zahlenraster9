@@ -35,6 +35,20 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.fast {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 4px; margin: -4px;
+  color: #f3f2d4; font: inherit; font-size: 14px; cursor: pointer;
+}
+.fast i { width: 24px; height: 24px; border: 2px solid #f3f2d4; border-radius: 7px; opacity: 0.55; box-sizing: border-box; }
+.fast span { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.fast[aria-pressed="true"] i { background: #ffd850; border-color: #ffd850; opacity: 1; }
+.fast[aria-pressed="true"] span { opacity: 1; }
+.fast:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
 .bar {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top, 0px));
@@ -85,6 +99,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </style>
 
 <canvas id="cv"></canvas>
+<button class="fast" id="fast" type="button" aria-pressed="false" aria-label="Mit Tempo wie bei 35 Punkten starten"><i></i><span>35</span></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -124,7 +139,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   for (var i = 0; i < 46; i++) stars.push({ x: Math.random() * WW, y: 430 + Math.random() * 640, r: 1 + Math.random() * 1.8, p: Math.random() * 6 });
 
   var state = "idle", score = 0, best = 0, dir = "y", flies = [], spawnT = 0, last = 0, clock = 0, gen = 0, failAt = null;
-  try { best = parseInt(localStorage.getItem("firefly-best"), 10) || 0; } catch (e) {}
+  // Box oben links: Tempo und Abstand wie bei 35 Punkten, Score trotzdem ab 0, eigene Bestwertung, mit Vorlauf
+  var HARD = 35, LEAD = 1.6, hard = false, hardBtn = document.getElementById("fast");
+  try { hard = localStorage.getItem("firefly-hard") === "1"; } catch (e) {}
+  function bestKey() { return hard ? "firefly-best-35" : "firefly-best"; }
+  function loadBest() { try { best = parseInt(localStorage.getItem(bestKey()), 10) || 0; } catch (e) { best = 0; } }
+  function lvl() { return score + (hard ? HARD : 0); }
+  hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+  loadBest();
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
   function later(fn, ms) { var g = gen; setTimeout(function () { if (g === gen) fn(); }, ms); }
@@ -151,7 +173,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function start() {
     state = "run";
     document.body.classList.remove("idle");
-    spawnT = 0; last = performance.now();
+    spawnT = hard ? LEAD : 0; last = performance.now();   // im 35er-Modus kurzer Vorlauf bis zum ersten Glühwürmchen
   }
   function tap() {
     if (state === "idle") { start(); return; }
@@ -161,7 +183,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function fail(side) {
     state = "fail"; failAt = { side: side, t: clock };
     var rec = score > best;
-    if (rec) { best = score; try { localStorage.setItem("firefly-best", String(best)); } catch (e) {} showBest(); }
+    if (rec) { best = score; try { localStorage.setItem(bestKey(), String(best)); } catch (e) {} showBest(); }
     document.getElementById("rec").hidden = !rec;
     later(function () { document.getElementById("pts").textContent = score + " Pts"; resultEl.hidden = false; state = "done"; }, 1200);
   }
@@ -171,9 +193,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     spawnT -= dt;
     if (spawnT <= 0) {
       flies.push({ col: Math.random() < 0.5 ? "c" : "y", y: TOPY, side: null, u: 0, t: clock });
-      spawnT += interval(score);
+      spawnT += interval(lvl());
     }
-    var v = vSpeed(score);
+    var v = vSpeed(lvl());
     for (var i = flies.length - 1; i >= 0; i--) {
       var f = flies[i];
       if (!f.side) {
@@ -297,12 +319,19 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
 
   document.addEventListener("pointerdown", function (e) {
-    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx"))) return;
+    if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx") || e.target.closest(".fast"))) return;
     e.preventDefault();
     tap();
   });
   document.addEventListener("keydown", function (e) { if (e.code === "Space") { e.preventDefault(); tap(); } });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  hardBtn.addEventListener("click", function (e) {
+    e.preventDefault(); e.stopPropagation();
+    hard = !hard;
+    try { localStorage.setItem("firefly-hard", hard ? "1" : "0"); } catch (e2) {}
+    hardBtn.setAttribute("aria-pressed", hard ? "true" : "false");
+    loadBest(); showBest(); idle();
+  });
   bindTap(document.getElementById("reset"), idle);
   bindTap(document.getElementById("ok"), idle);
 
