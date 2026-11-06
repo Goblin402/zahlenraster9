@@ -30,7 +30,7 @@
 :root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
 html, body { height: 100%; }
 body {
-  background: linear-gradient(180deg, #2b2836 0%, #3c3462 35%, #5a45c8 75%, #6a4ee2 100%);
+  background: linear-gradient(180deg, #2a2735 0%, #2f2c43 22%, #3b3462 39%, #423a7a 51%, #4b3f94 63%, #5543b1 75%, #6048cd 87%, #6a4ee2 100%);
   background-color: #3c3462;
   color: #fff;
   font-family: var(--font);
@@ -65,7 +65,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   position: absolute; left: 0; right: 0; top: 30.5%;
   transform: translateY(-50%);
   text-align: center;
-  font-size: min(21vw, 100px);
+  font-size: min(15.5vw, 76px);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   z-index: 3; pointer-events: none;
@@ -106,83 +106,99 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
 <script>
 (function () {
-  // Einheiten: Balldurchmesser = 1.
-  // Sprungdauer: 0,7 s am Anfang, 0,004 s kürzer pro Punkt (aus der Aufnahme: 0,65 / 0,6 / 0,5 / 0,38 / 0,3 s).
-  // Plattformbreite: 4 Bälle am Anfang, schrumpft auf 2 bei ca. 80 Punkten.
-  var D = 7.2, APEX = 3.2, R = 0.5, THICK = 0.55, AHEAD = 9, XMAX = 3.0, SHIFT = 2.6;
-  function hopTime(s) { return Math.max(0.26, 0.7 - 0.004 * s); }
-  function widthFor(s) { return Math.max(1.5, 4.0 - 0.026 * s); }
+  // Alles aus der Bildschirmaufnahme vermessen (Einheit: Plattformbreite am Anfang = 1).
+  // Kamera: 5,14 über der Plattform-Oberseite, 28,6° nach unten geneigt, Bildwinkel 54,8° (auf 390 x 844),
+  //         fährt gleichmäßig vorwärts, genau eine Plattform pro Sprung; Ball landet 4,69 vor der Kamera.
+  // Plattformen: Abstand 2,35, quadratisch, Breite 1 − 0,0055 je Plattform (0,45 bei 100),
+  //         die ersten 5 mittig, danach seitlich gleichverteilt zwischen −1,5 und +1,5 (unabhängig).
+  // Ball: Durchmesser 0,238, Sprunghöhe 1,9, Scheitel genau in der Mitte des Sprungs.
+  // Sprungdauer: 0,700 − 0,00551·n + 0,000017·n² Sekunden (0,70 s am Anfang, 0,32 s bei 100).
+  var CAM = { h: 5.14, pitch: 28.6, fovV: 54.8, ref: 390 / 844, ahead: 4.89 };
+  var D = 2.35, R = 0.119, APEX = 1.9, THICK = 0.11, XR = 1.5, BALL_AHEAD = 4.69, CENTERED = 5, AHEAD = 10;
+  function hopTime(n) { return Math.max(0.22, 0.700 - 0.00551 * n + 0.000017 * n * n); }
+  function widthFor(i) { return Math.max(0.35, Math.min(1, 1 - 0.0055 * i)); }
 
-  var CAM = { h: 11.5, d: 13, ahead: 26, fov: 50 };
   var canvas = document.getElementById("cv");
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(3, window.devicePixelRatio || 1));
   renderer.setClearColor(0x000000, 0);
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-  var sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(-3, 8, 6); scene.add(sun);
+  var camera = new THREE.PerspectiveCamera(CAM.fovV, 1, 0.05, 200);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  var sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-2, 6, 4); scene.add(sun);
 
   var boxGeo = new THREE.BoxGeometry(1, 1, 1);
   var M = {
-    top: new THREE.MeshBasicMaterial({ color: 0xffd84a }),
-    front: new THREE.MeshBasicMaterial({ color: 0xc99a2e }),
-    side: new THREE.MeshBasicMaterial({ color: 0xb98a24 })
+    top: new THREE.MeshBasicMaterial({ color: 0xffd852 }),
+    front: new THREE.MeshBasicMaterial({ color: 0x755f25 }),
+    side: new THREE.MeshBasicMaterial({ color: 0xc8a038 }),
+    bottom: new THREE.MeshBasicMaterial({ color: 0x8f7330 })
   };
-  // Reihenfolge der Box-Seiten: +x, -x, +y, -y, +z, -z
-  var MATS = [M.side, M.side, M.top, M.side, M.front, M.side];
-  var ball = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 20), new THREE.MeshPhongMaterial({ color: 0x111114, specular: 0x777777, shininess: 60 }));
+  // Box-Seiten: +x, -x, +y, -y, +z (zur Kamera), -z
+  var MATS = [M.side, M.side, M.top, M.bottom, M.front, M.side];
+  var ball = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 20), new THREE.MeshPhongMaterial({ color: 0x101014, specular: 0x3a3a44, shininess: 25 }));
   scene.add(ball);
 
   var scoreEl = document.getElementById("score"), bestEl = document.getElementById("best"), resultEl = document.getElementById("result");
-  var state = "idle", score = 0, best = 0, plats = [], idx = 0, hopT = 0, hopDur = 0.7, bx = 0, by = 0, bz = 0, vy = 0, fallT = 0, camZ = 0, gen = 0, lastX = null;
+  var state = "idle", score = 0, best = 0, plats = [], bits = [], idx = 0, hopT = 0, hopDur = 0.7;
+  var bx = 0, by = R, bvy = 0, camZ = 0, fallT = 0, lastX = null, gen = 0, paused = false;
   try { best = parseInt(localStorage.getItem("trampbox-best"), 10) || 0; } catch (e) {}
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
 
   function addPlat(i) {
-    var prev = plats.length ? plats[plats.length - 1] : null;
-    var x = prev ? Math.max(-XMAX, Math.min(XMAX, prev.x + (Math.random() * 2 - 1) * SHIFT)) : 0;
-    var w = widthFor(i);
+    var w = widthFor(i), x = i < CENTERED ? 0 : (Math.random() * 2 - 1) * XR;
     var m = new THREE.Mesh(boxGeo, MATS);
     m.scale.set(w, THICK, w);
     m.position.set(x, -THICK / 2, -i * D);
     scene.add(m);
-    plats.push({ i: i, x: x, w: w, mesh: m, falling: false, vy: 0, rx: 0, rz: 0 });
+    plats.push({ i: i, x: x, w: w, mesh: m });
   }
-  function clear() { plats.forEach(function (p) { scene.remove(p.mesh); }); plats = []; }
   function plat(i) { for (var k = 0; k < plats.length; k++) if (plats[k].i === i) return plats[k]; return null; }
+  function clearAll() {
+    plats.forEach(function (p) { scene.remove(p.mesh); }); plats = [];
+    bits.forEach(function (b) { scene.remove(b.mesh); }); bits = [];
+  }
+  // Getroffene Plattform bricht in zwei Hälften, die seitlich wegkippen und herunterfallen
+  function split(p) {
+    scene.remove(p.mesh);
+    plats.splice(plats.indexOf(p), 1);
+    [-1, 1].forEach(function (sgn) {
+      var m = new THREE.Mesh(boxGeo, MATS);
+      m.scale.set(p.w / 2, THICK, p.w);
+      m.position.set(p.x + sgn * p.w / 4, -THICK / 2, p.mesh.position.z);
+      scene.add(m);
+      bits.push({ mesh: m, vx: sgn * (1.2 + Math.random() * 0.6), vy: -0.5, vz: 0.6, rz: -sgn * (5 + Math.random() * 2), rx: 0.4 + Math.random() * 0.6 });
+    });
+  }
 
   function idle() {
     gen++;
     state = "idle"; score = 0; idx = 0; hopT = 0;
     scoreEl.textContent = "0";
     resultEl.hidden = true;
-    clear();
+    clearAll();
     for (var i = 0; i <= AHEAD; i++) addPlat(i);
-    bx = 0; by = R; bz = 0; camZ = 0;
+    bx = 0; by = R;
     document.body.classList.add("idle");
   }
   function start() {
     state = "run";
     document.body.classList.remove("idle");
-    beginHop();
-  }
-  function beginHop() {
-    hopT = 0; hopDur = hopTime(score);
-    var p = plat(idx);
-    if (p) setTimeout(function () { p.falling = true; p.rx = (Math.random() - 0.5) * 3; p.rz = (Math.random() - 0.5) * 3; }, 120);
+    hopT = 0; hopDur = hopTime(0);
+    var p = plat(0); if (p) split(p);
   }
   function land() {
     idx++;
-    var p = plat(idx);
-    if (p && Math.abs(bx - p.x) <= p.w / 2 + R * 0.4) {
+    var p = plat(idx), bzRel = BALL_AHEAD - CAM.ahead;   // Ball landet 0,2 vor der Plattformmitte
+    if (p && Math.abs(bx - p.x) <= p.w / 2 + R * 0.5 && Math.abs(bzRel) <= p.w / 2 + R * 0.5) {
       score++;
       scoreEl.textContent = score;
+      split(p);
       addPlat(idx + AHEAD);
-      beginHop();
+      hopT = 0; hopDur = hopTime(score);
     } else {
-      state = "fall"; vy = -2; fallT = 0;
+      state = "fall"; bvy = 0; fallT = 0;
     }
   }
   function finish() {
@@ -198,40 +214,36 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (state === "run") {
       hopT += dt;
       var u = Math.min(1, hopT / hopDur);
-      bz = -(idx + u) * D;
       by = R + APEX * 4 * u * (1 - u);
-      if (u >= 1) land();
+      camZ = -(idx + u) * D + CAM.ahead;
+      if (u >= 1) { land(); if (window.__tbStopAt && score >= window.__tbStopAt) paused = true; }
     } else if (state === "fall") {
-      vy -= 30 * dt; by += vy * dt; bz -= D / hopDur * dt * 0.5;
-      fallT += dt;
+      bvy -= 14 * dt; by += bvy * dt; fallT += dt;
       if (fallT > 0.9) finish();
     }
-    // Plattformen hinter dem Ball fallen weg
-    for (var k = plats.length - 1; k >= 0; k--) {
-      var p = plats[k];
-      if (p.falling) {
-        p.vy -= 22 * dt;
-        p.mesh.position.y += p.vy * dt;
-        p.mesh.position.z += 1.5 * dt;
-        p.mesh.rotation.x += p.rx * dt; p.mesh.rotation.z += p.rz * dt;
-        if (p.mesh.position.y < -30) { scene.remove(p.mesh); plats.splice(k, 1); }
-      }
+    for (var k = bits.length - 1; k >= 0; k--) {
+      var b = bits[k];
+      b.vy -= 22 * dt;
+      b.mesh.position.x += b.vx * dt; b.mesh.position.y += b.vy * dt; b.mesh.position.z += b.vz * dt;
+      b.mesh.rotation.z += b.rz * dt; b.mesh.rotation.x += b.rx * dt;
+      if (b.mesh.position.y < -12) { scene.remove(b.mesh); bits.splice(k, 1); }
     }
+    for (var q = plats.length - 1; q >= 0; q--) if (plats[q].i < idx - 2) { scene.remove(plats[q].mesh); plats.splice(q, 1); }
   }
   function place() {
-    ball.position.set(bx, by, bz);
-    camZ += (bz - camZ) * 0.15;
-    if (state === "idle") camZ = bz;
-    camera.position.set(0, CAM.h, camZ + CAM.d);
-    camera.lookAt(0, 0, camZ - CAM.ahead);
+    if (state === "idle") camZ = CAM.ahead;
+    ball.position.set(bx, by, camZ - BALL_AHEAD);
+    var pr = CAM.pitch * Math.PI / 180;
+    camera.position.set(0, CAM.h, camZ);
+    camera.rotation.set(-pr, 0, 0);
   }
   function resize() {
     var w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    // Bildausschnitt über die Breite halten (wie auf 390 x 844)
-    var ref = 390 / 844, f = CAM.fov;
-    camera.fov = camera.aspect < ref ? f * ref / camera.aspect * 0.98 : f;
+    // gleicher seitlicher Bildwinkel wie auf dem iPhone (390 x 844)
+    var t = Math.tan(CAM.fovV * Math.PI / 360) * CAM.ref / camera.aspect;
+    camera.fov = Math.atan(t) * 360 / Math.PI;
     camera.updateProjectionMatrix();
   }
   window.addEventListener("resize", resize);
@@ -241,17 +253,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function frame(t) {
     var dt = Math.min(0.05, (t - last) / 1000); last = t;
     var n = Math.max(1, Math.ceil(dt / (1 / 240)));
-    for (var i = 0; i < n; i++) { if (state === "run" || state === "fall" || plats.some(function (p) { return p.falling; })) step(dt / n); }
+    if (!paused) for (var i = 0; i < n; i++) step(dt / n);
     place();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
 
-  // Lenken: seitlich ziehen, 1:1 zur Bildschirmbewegung auf Höhe des Balls
+  // Lenken: seitlich ziehen, der Ball folgt dem Finger 1:1 (auf Höhe des Balls gemessen)
   function unitsPerPx() {
     var dist = camera.position.distanceTo(ball.position);
-    var hView = 2 * Math.tan(camera.fov * Math.PI / 360) * dist;
-    return hView / window.innerHeight;
+    return 2 * Math.tan(camera.fov * Math.PI / 360) * dist / window.innerHeight;
   }
   document.addEventListener("pointerdown", function (e) {
     if (e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx"))) return;
@@ -260,9 +271,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (state === "idle") start();
   });
   document.addEventListener("pointermove", function (e) {
-    if (lastX === null || (state !== "run" && state !== "fall")) return;
+    if (lastX === null) return;
     var dx = e.clientX - lastX; lastX = e.clientX;
-    if (state === "run") bx = Math.max(-7, Math.min(7, bx + dx * unitsPerPx()));
+    if (state === "run") bx = Math.max(-2.3, Math.min(2.3, bx + dx * unitsPerPx()));
   });
   function up() { lastX = null; }
   document.addEventListener("pointerup", up);
@@ -270,8 +281,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   document.addEventListener("keydown", function (e) {
     if (state === "idle" && e.code === "Space") { start(); return; }
     if (state !== "run") return;
-    if (e.key === "ArrowLeft") bx -= 0.5;
-    if (e.key === "ArrowRight") bx += 0.5;
+    if (e.key === "ArrowLeft") bx -= 0.25;
+    if (e.key === "ArrowRight") bx += 0.25;
   });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
   bindTap(document.getElementById("reset"), idle);
@@ -280,8 +291,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   idle();
   requestAnimationFrame(function (t) { last = t; frame(t); });
   window.__tb = {
-    get s() { var p = plat(idx + 1); return { state: state, score: score, bx: bx, next: p && p.x, w: p && p.w, idx: idx }; },
-    setX: function (x) { bx = x; }
+    get s() { var p = plat(idx + 1); return { state: state, score: score, bx: bx, next: p && p.x, w: p && p.w, idx: idx, hop: hopT / hopDur }; },
+    setX: function (x) { bx = x; },
+    pause: function (v) { paused = v; }   // nur für Tests
   };
 })();
 </script>
