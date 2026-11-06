@@ -247,10 +247,12 @@ body {
 
 <script>
 (function () {
-  // Werte aus dem Video gemessen: Balken leert sich anfangs mit ca. 0,13 /s und wird pro Punkt schneller,
-  // jede Box hat ihr eigenes Tempo, ein richtiger Wisch gibt +42 % Balken zurück.
-  var BASE = 0.13, PER_POINT = 0.005, REFILL = 0.42, LOW = 0.5;
-  var FACTORS = [0.72, 0.92, 1.0, 1.36];
+  // Aus der Bildschirmaufnahme (70 Punkte) Bild für Bild vermessen:
+  // Die vier Boxen leeren sich am Anfang mit 0,13 / 0,19 / 0,22 / 0,27 Balken pro Sekunde (Mittel 0,20),
+  // jede wird pro Punkt 1,7 % schneller (bei 60 Punkten also etwa doppelt so schnell).
+  // Ein richtiger Wisch füllt 40 % auf (höchstens voll), unter 55 % wird der Balken orange.
+  var BASE = 0.20, PER_POINT = 0.017, REFILL = 0.40, LOW = 0.55;
+  var FACTORS = [0.67, 0.93, 1.08, 1.34];
   var DIRS = ["up", "right", "down", "left"];
   var ROT = { up: 0, right: 90, down: 180, left: 270 };
   var ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.8 2.2 11.6l3 3 4.6-4.6V22.2h4.4V10l4.6 4.6 3-3Z" fill="#fff"/></svg>';
@@ -365,7 +367,7 @@ body {
     var dt = Math.min(0.1, (t - last) / 1000);
     last = t;
     if (state === "run") {
-      var rate = BASE + PER_POINT * score;
+      var rate = BASE * (1 + PER_POINT * score);
       for (var k = 0; k < 4; k++) {
         var b = boxes[k];
         b.val -= b.factor * rate * dt;
