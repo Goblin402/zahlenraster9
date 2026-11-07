@@ -1,0 +1,487 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Hole Rush</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Hole Rush: Minigolf auf Kachelbahnen, 30 Sekunden, so viele Löcher wie möglich.
+   Maße aus der Bildschirmaufnahme: Feld 6 x 10 Kacheln, Kachel 14,4 % der Breite, Höhe 81 % der Breite (leicht geneigte Sicht). */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body {
+  background: #17131f; color: #fff; font-family: var(--font); font-weight: 800;
+  position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; gap: 8px; align-items: center; z-index: 6;
+}
+.bar button, .best {
+  background: rgba(10, 4, 22, 0.6); color: #fff4e6; border: 0; border-radius: 999px;
+  padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:active { transform: scale(0.94); }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.result {
+  position: absolute; inset: 0; z-index: 7; background: rgba(8, 4, 16, 0.9);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center;
+}
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(11vw, 52px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Eingelocht</div>
+  <div class="pts" id="pts">0</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+
+<script>
+(function () {
+  // Welt in Kacheln (1 = eine Kachel). Gemessen: Abschlag bis knapp 14 Kacheln/s, Rollen bremst etwa
+  // exponentiell (k ~ 1,1/s), Bande nimmt rund ein Drittel des Tempos.
+  var COLS = 6, ROWS = 10, TIME = 30;
+  var VMAX = 13.5, DAMP = 0.95, DECEL = 0.9, STOP = 0.22, REST = 0.62;
+  var SAND_DAMP = 5.5, BUMP_REST = 1.15, BUMP_MIN = 6, BOOST_V = 13;
+  var BR = 0.13, HOLE_R = 0.2, SINK_V = 8.5, PULL_R = 0.36, BEVEL = 0.42;
+  var MAX_DRAG = 1.75; // in Kachelbreiten
+
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var bestEl = document.getElementById("best"), resultEl = document.getElementById("result");
+  var Ws, Hs, dpr, tw, th, X0, Y0, TOP;
+  function layout() {
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    Ws = window.innerWidth; Hs = window.innerHeight;
+    cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr);
+    tw = Ws * 0.1439; th = tw * 0.814;
+    var maxH = Hs * 0.80;
+    if (ROWS * th + 8 > maxH) { th = (maxH - 8) / ROWS; tw = th / 0.814; }
+    X0 = (Ws - COLS * tw) / 2;
+    Y0 = Hs - Hs * 0.035 - ROWS * th - 8;
+    TOP = Math.max(Y0 - Ws * 0.2, 60);
+  }
+  window.addEventListener("resize", layout);
+  layout();
+
+  var state = "idle", holes = 0, best = 0, tLeft = TIME, course = null, ball = null, aim = null, sink = 0, gen = 0, pause = 0;
+  try { best = parseInt(localStorage.getItem("holerush-best"), 10) || 0; } catch (e) {}
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+
+  function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function key(c, r) { return c + "," + r; }
+
+  // ---------- Bahn erzeugen ----------
+  function makePath(L) {
+    var cells = {}, order = [];
+    function add(c, r) { var k = key(c, r); if (!cells[k]) { cells[k] = { c: c, r: r }; order.push(cells[k]); } }
+    var start, holeCell;
+    if (L === 0) {
+      // breite, versetzte Bahn
+      var col = ri(2, 4), row = ROWS - 1;
+      start = { c: col + (Math.random() < 0.5 ? 0 : 1), r: row };
+      while (row >= 0) {
+        var len = Math.min(row + 1, ri(3, 4));
+        for (var i = 0; i < len; i++) { add(col, row - i); add(col + 1, row - i); }
+        row -= len;
+        if (row < 0) break;
+        var nc = col + (Math.random() < 0.5 ? -1 : 1);
+        if (nc < 0) nc = 1; if (nc > COLS - 2) nc = COLS - 3;
+        col = nc;
+      }
+      holeCell = { c: col + (Math.random() < 0.5 ? 0 : 1), r: 0 };
+      if (holeCell.c === start.c && Math.random() < 0.7) holeCell.c = col + (holeCell.c === col ? 1 : 0);
+      return { cells: cells, order: order, start: start, hole: holeCell, dirs: {} };
+    }
+    var c = ri(0, COLS - 1), r = ROWS - 1, dirs = {};
+    start = { c: c, r: r };
+    add(c, r);
+    var first = true, maxV = L < 3 ? 4 : 3;
+    while (r > 0) {
+      var v = first ? ri(1, 3) : ri(2, maxV);
+      first = false;
+      v = Math.min(v, r);
+      for (var j = 0; j < v; j++) { dirs[key(c, r)] = "u"; r--; add(c, r); }
+      if (r === 0) break;
+      var room = Math.random() < 0.5 ? -1 : 1;
+      if (c + room < 0 || c + room > COLS - 1) room = -room;
+      var space = room < 0 ? c : COLS - 1 - c;
+      var h = Math.min(space, ri(1, L < 2 ? 3 : 4));
+      if (h < 1) continue;
+      for (var k = 0; k < h; k++) { dirs[key(c, r)] = room < 0 ? "l" : "r"; c += room; add(c, r); }
+    }
+    // Loch: letzte Zelle, manchmal ein Stück daneben in Zeile 0
+    holeCell = { c: c, r: 0 };
+    if (L >= 2 && Math.random() < 0.45) {
+      var side = c >= COLS - 1 ? -1 : c <= 0 ? 1 : (Math.random() < 0.5 ? -1 : 1);
+      dirs[key(c, 0)] = side < 0 ? "l" : "r";
+      add(c + side, 0); holeCell = { c: c + side, r: 0 };
+    }
+    return { cells: cells, order: order, start: start, hole: holeCell, dirs: dirs };
+  }
+  function isCell(cs, c, r) { return !!cs[key(c, r)]; }
+  function build(L) {
+    var p;
+    for (var tries = 0; tries < 40; tries++) { p = makePath(L); if (p.order.length >= (L === 0 ? 10 : 8)) break; }
+    var cs = p.cells, segs = [], bevels = {}, sand = {}, boost = {}, bumpers = [];
+    var sk = key(p.start.c, p.start.r), hk = key(p.hole.c, p.hole.r);
+    // Schrägen an den Außenecken von Kurven
+    var bevelP = L === 0 ? 0 : Math.min(0.9, 0.45 + 0.08 * L);
+    p.order.forEach(function (cell) {
+      var k = key(cell.c, cell.r);
+      if (k === sk || k === hk) return;
+      var U = isCell(cs, cell.c, cell.r - 1), D = isCell(cs, cell.c, cell.r + 1), Lf = isCell(cs, cell.c - 1, cell.r), R = isCell(cs, cell.c + 1, cell.r);
+      var n = (U ? 1 : 0) + (D ? 1 : 0) + (Lf ? 1 : 0) + (R ? 1 : 0);
+      if (n !== 2 || (U && D) || (Lf && R)) return;
+      if (Math.random() > bevelP) return;
+      // Ecke, an der beide Wände sind
+      bevels[k] = (U ? "b" : "t") + (Lf ? "r" : "l");
+    });
+    // Wände
+    function wall(x1, y1, x2, y2, bump) { segs.push({ x1: x1, y1: y1, x2: x2, y2: y2, bump: !!bump }); }
+    p.order.forEach(function (cell) {
+      var x = cell.c, y = cell.r, b = bevels[key(x, y)] || "", bt = b[0] === "t", bb = b[0] === "b", bl = b[1] === "l", br = b[1] === "r";
+      if (!isCell(cs, x, y - 1)) wall(x + (bt && bl ? BEVEL : 0), y, x + 1 - (bt && br ? BEVEL : 0), y);
+      if (!isCell(cs, x, y + 1)) wall(x + (bb && bl ? BEVEL : 0), y + 1, x + 1 - (bb && br ? BEVEL : 0), y + 1);
+      if (!isCell(cs, x - 1, y)) wall(x, y + (bt && bl ? BEVEL : 0), x, y + 1 - (bb && bl ? BEVEL : 0));
+      if (!isCell(cs, x + 1, y)) wall(x + 1, y + (bt && br ? BEVEL : 0), x + 1, y + 1 - (bb && br ? BEVEL : 0));
+      if (bt && bl) wall(x, y + BEVEL, x + BEVEL, y);
+      if (bt && br) wall(x + 1 - BEVEL, y, x + 1, y + BEVEL);
+      if (bb && bl) wall(x, y + 1 - BEVEL, x + BEVEL, y + 1);
+      if (bb && br) wall(x + 1 - BEVEL, y + 1, x + 1, y + 1 - BEVEL);
+    });
+    var free = p.order.filter(function (cell) { var k = key(cell.c, cell.r); return k !== sk && k !== hk && !bevels[k]; });
+    function take() { if (!free.length) return null; var i = Math.floor(Math.random() * free.length); return free.splice(i, 1)[0]; }
+    // Federbanden: ein Stück gerade Wand wird orange und federt
+    var nb = L === 0 ? 0 : L < 4 ? 1 : ri(1, 2);
+    var cand = segs.filter(function (s) { return (s.x1 === s.x2 || s.y1 === s.y2) && Math.abs(s.x2 - s.x1 + s.y2 - s.y1) === 1; });
+    for (var i = 0; i < nb && cand.length; i++) {
+      var s = cand.splice(Math.floor(Math.random() * cand.length), 1)[0];
+      s.bump = true; bumpers.push(s);
+    }
+    // Beschleuniger in Laufrichtung
+    if (L >= 2 && (L < 4 || Math.random() < 0.7)) {
+      var opts = free.filter(function (cell) { return p.dirs[key(cell.c, cell.r)]; });
+      if (opts.length) {
+        var bc = opts[Math.floor(Math.random() * opts.length)];
+        boost[key(bc.c, bc.r)] = p.dirs[key(bc.c, bc.r)];
+        free.splice(free.indexOf(bc), 1);
+      }
+    }
+    // Sand
+    if (L >= 3) {
+      var ns = L < 5 ? 1 : ri(1, 2);
+      for (var q = 0; q < ns; q++) { var sc = take(); if (sc) sand[key(sc.c, sc.r)] = true; }
+    }
+    return { cells: cs, order: p.order, segs: segs, bevels: bevels, sand: sand, boost: boost,
+      start: { x: p.start.c + 0.5, y: p.start.r + 0.6 }, hole: { x: p.hole.c + 0.5, y: p.hole.r + 0.45 } };
+  }
+
+  function newCourse() {
+    course = build(holes);
+    ball = { x: course.start.x, y: course.start.y, vx: 0, vy: 0, moving: false, s: 1 };
+    aim = null; sink = 0;
+  }
+
+  // ---------- Physik ----------
+  function cellAt(x, y) { return course.cells[key(Math.floor(x), Math.floor(y))]; }
+  function collide() {
+    var segs = course.segs;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i], ex = s.x2 - s.x1, ey = s.y2 - s.y1, l2 = ex * ex + ey * ey;
+      var t = ((ball.x - s.x1) * ex + (ball.y - s.y1) * ey) / l2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      var px = s.x1 + ex * t, py = s.y1 + ey * t, dx = ball.x - px, dy = ball.y - py, d = Math.sqrt(dx * dx + dy * dy);
+      if (d >= BR || d === 0) continue;
+      var nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+      ball.x = px + nx * BR; ball.y = py + ny * BR;
+      if (vn < 0) {
+        var e = s.bump ? BUMP_REST : REST;
+        ball.vx -= (1 + e) * vn * nx; ball.vy -= (1 + e) * vn * ny;
+        if (s.bump) {
+          var sp = Math.hypot(ball.vx, ball.vy);
+          if (sp < BUMP_MIN) { ball.vx *= BUMP_MIN / sp; ball.vy *= BUMP_MIN / sp; }
+          s.flash = 0.25;
+        }
+      }
+    }
+  }
+  function step(dt) {
+    if (!ball.moving) return;
+    var k = key(Math.floor(ball.x), Math.floor(ball.y));
+    var damp = course.sand[k] ? SAND_DAMP : DAMP;
+    var sp = Math.hypot(ball.vx, ball.vy);
+    var bd = course.boost[k];
+    if (bd) {
+      var cx = Math.floor(ball.x) + 0.5, cy = Math.floor(ball.y) + 0.5;
+      if (Math.abs(ball.x - cx) < 0.42 && Math.abs(ball.y - cy) < 0.42) {
+        var bx = bd === "l" ? -1 : bd === "r" ? 1 : 0, by = bd === "u" ? -1 : bd === "d" ? 1 : 0;
+        ball.vx = bx * BOOST_V; ball.vy = by * BOOST_V;
+        if (bx === 0) ball.x += (cx - ball.x) * 0.3; else ball.y += (cy - ball.y) * 0.3;
+        sp = BOOST_V;
+      }
+    }
+    // Loch zieht leicht an, langsamer Ball fällt rein
+    var hx = course.hole.x - ball.x, hy = course.hole.y - ball.y, hd = Math.hypot(hx, hy);
+    if (hd < PULL_R && hd > 0.001) {
+      var a = 22 * (1 - hd / PULL_R);
+      ball.vx += hx / hd * a * dt; ball.vy += hy / hd * a * dt;
+    }
+    if (hd < HOLE_R && sp < SINK_V) { ball.moving = false; state = "sink"; sink = 0; ball.sx = ball.x; ball.sy = ball.y; return; }
+    if (sp > 0) {
+      var ns = sp * Math.exp(-damp * dt) - DECEL * dt;
+      if (ns < STOP && hd > PULL_R) { ball.vx = 0; ball.vy = 0; ball.moving = false; return; }
+      if (ns < 0) ns = 0;
+      ball.vx *= ns / sp; ball.vy *= ns / sp;
+    }
+    ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+    collide();
+    // Sicherheitsnetz: falls der Ball doch die Bahn verlässt, zurück zum Start
+    if (!cellAt(ball.x, ball.y)) { ball.x = course.start.x; ball.y = course.start.y; ball.vx = ball.vy = 0; ball.moving = false; }
+  }
+
+  function finish() {
+    state = "done";
+    var rec = holes > best;
+    if (rec) { best = holes; try { localStorage.setItem("holerush-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = holes + (holes === 1 ? " Loch" : " Löcher");
+    var g = gen;
+    setTimeout(function () { if (g === gen) resultEl.hidden = false; }, 500);
+  }
+  function update(dt) {
+    course.segs.forEach(function (s) { if (s.flash) s.flash = Math.max(0, s.flash - dt); });
+    if (state === "run" || state === "sink") {
+      if (state === "run") { tLeft -= dt; if (tLeft <= 0) { tLeft = 0; finish(); return; } }
+      if (state === "run") {
+        var n = Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy) * dt / 0.03));
+        for (var i = 0; i < n && state === "run"; i++) step(dt / n);
+      } else {
+        sink += dt;
+        ball.x += (course.hole.x - ball.x) * Math.min(1, dt * 14); ball.y += (course.hole.y - ball.y) * Math.min(1, dt * 14);
+        ball.s = Math.max(0, 1 - sink / 0.25);
+        if (sink >= 0.25 && pause === 0) { holes++; pause = 0.55; }
+        if (pause > 0) { pause -= dt; if (pause <= 0) { pause = 0; newCourse(); state = "run"; } }
+      }
+    }
+  }
+
+  // ---------- Zeichnen ----------
+  function sx(x) { return X0 + x * tw; }
+  function sy(y) { return Y0 + y * th; }
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#17131f"; ctx.fillRect(0, 0, Ws, Hs);
+    // Punkteraster im Hintergrund
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    for (var gx = 0; gx <= COLS; gx++) for (var gy = 0; gy <= ROWS; gy++) { ctx.beginPath(); ctx.arc(sx(gx), sy(gy), 1.6, 0, 7); ctx.fill(); }
+    var thick = Math.max(4, th * 0.09), rad = tw * 0.1;
+    // Dicke (Seitenkante)
+    course.order.forEach(function (c) {
+      if (course.cells[key(c.c, c.r + 1)]) return;
+      ctx.fillStyle = "#1f5a2a"; rr(sx(c.c) + 1, sy(c.r) + 2, tw - 2, th - 2 + thick, rad); ctx.fill();
+    });
+    // Rasen (Fläche mit Rand)
+    ctx.fillStyle = "#2f6b34";
+    course.order.forEach(function (c) { ctx.fillRect(sx(c.c) - 1, sy(c.r) - 1, tw + 2, th + 2); });
+    course.order.forEach(function (c) {
+      var k = key(c.c, c.r), x = sx(c.c) + 3, y = sy(c.r) + 3, w = tw - 6, h = th - 6;
+      ctx.fillStyle = course.sand[k] ? "#d9bf7a" : "#4f9a4f";
+      if (course.sand[k]) { rr(x + 2, y + 2, w - 4, h - 4, rad); ctx.fill(); ctx.fillStyle = "rgba(120,90,40,0.5)"; for (var d = 0; d < 6; d++) { ctx.beginPath(); ctx.arc(x + w * (0.25 + 0.5 * ((d * 37) % 10) / 10), y + h * (0.25 + 0.5 * ((d * 53) % 10) / 10), 1.4, 0, 7); ctx.fill(); } }
+      else { rr(x, y, w, h, rad * 0.6); ctx.fill(); }
+      var b = course.bevels[k];
+      if (b) {
+        ctx.fillStyle = "#2a5f2f"; ctx.beginPath();
+        var cx = b[1] === "l" ? sx(c.c) : sx(c.c + 1), cy = b[0] === "t" ? sy(c.r) : sy(c.r + 1);
+        var ddx = b[1] === "l" ? 1 : -1, ddy = b[0] === "t" ? 1 : -1;
+        ctx.moveTo(cx, cy); ctx.lineTo(cx + ddx * BEVEL * tw, cy); ctx.lineTo(cx, cy + ddy * BEVEL * th); ctx.closePath(); ctx.fill();
+      }
+      var bd = course.boost[k];
+      if (bd) {
+        var mx = sx(c.c + 0.5), my = sy(c.r + 0.5), s = tw * 0.17;
+        ctx.save(); ctx.translate(mx, my); ctx.rotate(bd === "r" ? 0 : bd === "l" ? Math.PI : bd === "u" ? -Math.PI / 2 : Math.PI / 2);
+        ctx.fillStyle = "#e8742c"; rr(-s * 1.6, -s * 1.05, s * 3.2, s * 2.1, s * 0.5); ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(2, s * 0.32); ctx.lineCap = "round"; ctx.lineJoin = "round";
+        [-0.45, 0.45].forEach(function (o) { ctx.beginPath(); ctx.moveTo((o - 0.35) * s, -0.5 * s); ctx.lineTo((o + 0.25) * s, 0); ctx.lineTo((o - 0.35) * s, 0.5 * s); ctx.stroke(); });
+        ctx.restore();
+      }
+    });
+    // Federbanden
+    course.segs.forEach(function (s) {
+      if (!s.bump) return;
+      var horiz = s.y1 === s.y2, ox = 0, oy = 0;
+      // nach innen versetzen
+      var cx = (s.x1 + s.x2) / 2, cy = (s.y1 + s.y2) / 2;
+      if (horiz) oy = course.cells[key(Math.floor(cx), Math.floor(cy - 0.5))] && !course.cells[key(Math.floor(cx), Math.floor(cy + 0.5))] ? -0.1 : 0.1;
+      else ox = course.cells[key(Math.floor(cx - 0.5), Math.floor(cy))] && !course.cells[key(Math.floor(cx + 0.5), Math.floor(cy))] ? -0.1 : 0.1;
+      var x = sx(cx + ox), y = sy(cy + oy), L = (horiz ? tw : th) * 0.78, T = Math.max(6, tw * 0.1);
+      ctx.save(); ctx.translate(x, y); if (!horiz) ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = s.flash ? "#ffb070" : "#e8742c"; rr(-L / 2, -T / 2, L, T, T / 2); ctx.fill();
+      ctx.fillStyle = "#fff"; [-0.25, 0, 0.25].forEach(function (f) { ctx.beginPath(); ctx.arc(f * L, 0, T * 0.18, 0, 7); ctx.fill(); });
+      ctx.restore();
+    });
+    // Loch + Fahne
+    var hx = sx(course.hole.x), hy = sy(course.hole.y), hr = HOLE_R * tw;
+    ctx.fillStyle = "#f4f1ea"; ctx.beginPath(); ctx.arc(hx, hy, hr * 1.22, 0, 7); ctx.fill();
+    ctx.fillStyle = "#0d0b0f"; ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#ddd"; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy - th * 0.95); ctx.stroke();
+    ctx.fillStyle = "#e53b3b"; ctx.beginPath(); ctx.moveTo(hx + 1, hy - th * 0.95); ctx.lineTo(hx + tw * 0.42, hy - th * 0.85); ctx.lineTo(hx + 1, hy - th * 0.66); ctx.closePath(); ctx.fill();
+    // Zielhilfe
+    var bx = sx(ball.x), by = sy(ball.y), br = BR * tw;
+    if (aim && aim.p > 0.02) {
+      var dx = aim.dx, dy = aim.dy, len = aim.p * 3.1;
+      ctx.fillStyle = "#fff";
+      for (var t = 0.42; t < len; t += 0.2) { ctx.beginPath(); ctx.arc(sx(ball.x + dx * t), sy(ball.y + dy * t), br * 0.32, 0, 7); ctx.fill(); }
+      var ex = sx(ball.x + dx * (len + 0.15)), ey = sy(ball.y + dy * (len + 0.15)), ang = Math.atan2(dy * th, dx * tw), a = br * 0.75;
+      ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang); ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(-a * 0.7, -a * 0.75); ctx.lineTo(-a * 0.7, a * 0.75); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = "#ef7a2e"; ctx.lineWidth = br * 0.42; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(bx, by, br * 1.85, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * aim.p); ctx.stroke();
+    }
+    // Ball
+    if (ball.s > 0) {
+      var r = br * (0.4 + 0.6 * ball.s);
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.arc(bx + 1.5, by + 2, r, 0, 7); ctx.fill();
+      ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(bx, by, r, 0, 7); ctx.fill();
+    }
+    // Zeit + Lochzähler
+    var font = getComputedStyle(document.body).fontFamily;
+    ctx.textBaseline = "middle";
+    ctx.font = "800 " + Math.round(Ws * 0.1) + "px " + font; ctx.textAlign = "left";
+    ctx.fillStyle = (state === "sink" && pause > 0) || state === "idle" ? "rgba(255,255,255,0.4)" : "#fff";
+    ctx.fillText(tLeft.toFixed(1), X0, TOP);
+    ctx.textAlign = "right"; ctx.font = "800 " + Math.round(Ws * 0.075) + "px " + font; ctx.fillStyle = "#7fd17f";
+    ctx.fillText("⛳ " + holes, X0 + COLS * tw, TOP);
+    if (state === "idle") {
+      ctx.fillStyle = "rgba(10,6,14,0.55)"; ctx.fillRect(0, Y0 - 10, Ws, Hs);
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "800 " + Math.round(Math.min(Ws * 0.07, 30)) + "px " + font;
+      ctx.fillText("Ziehen, zielen, loslassen", Ws / 2, Hs * 0.5); ctx.fillText("30 Sekunden", Ws / 2, Hs * 0.5 + Math.min(Ws * 0.085, 36));
+      ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill();
+    }
+  }
+
+  var last = 0;
+  function frame(t) {
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    update(dt); draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Eingabe: irgendwo ziehen, Schuss geht entgegen der Zugrichtung ----------
+  var drag = null;
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) {
+    if (ui(e)) return;
+    e.preventDefault();
+    if (state === "done" || state === "sink" || ball.moving) return;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    aim = { dx: 0, dy: -1, p: 0 };
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var dx = (drag.x - e.clientX) / tw, dy = (drag.y - e.clientY) / th, len = Math.hypot(dx, dy);
+    var p = Math.min(1, Math.hypot(drag.x - e.clientX, drag.y - e.clientY) / (MAX_DRAG * tw));
+    if (len > 0.0001) aim = { dx: dx / len, dy: dy / len, p: p };
+  });
+  function release(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    if (aim && aim.p > 0.06 && (state === "run" || state === "idle") && !ball.moving) {
+      if (state === "idle") { state = "run"; }
+      ball.vx = aim.dx * aim.p * VMAX; ball.vy = aim.dy * aim.p * VMAX; ball.moving = true;
+    }
+    aim = null;
+  }
+  document.addEventListener("pointerup", release);
+  document.addEventListener("pointercancel", function () { drag = null; aim = null; });
+
+  function reset() {
+    gen++; state = "idle"; holes = 0; tLeft = TIME; pause = 0; resultEl.hidden = true; drag = null;
+    newCourse();
+  }
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+
+  reset();
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+  window.__hr = {
+    get s() { return { state: state, holes: holes, t: tLeft, ball: ball, course: course }; },
+    shoot: function (dx, dy, p) { var l = Math.hypot(dx, dy); if (state === "idle") state = "run"; ball.vx = dx / l * p * VMAX; ball.vy = dy / l * p * VMAX; ball.moving = true; },
+    level: function (n) { holes = n; newCourse(); }
+  };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
