@@ -66,6 +66,8 @@ h1{font-size:28px;margin:8px 0 20px}
   <a href="piano.html" data-g="piano">Piano<small>Weiße Tasten antippen, bevor sie verschwinden</small></a>
   <a href="holerush.html" data-g="holerush">Hole Rush<small>Minigolf: 30 Sekunden, so viele Löcher wie möglich</small></a>
   <a href="knife.html" data-g="knife">Knife Throw<small>Messer in den drehenden Stamm werfen</small></a>
+  <a href="speedgolf.html" data-g="speedgolf">Speedgolf<small>4 Minigolf-Bahnen auf Zeit</small></a>
+  <a href="colormemory.html" data-g="colormemory">Color Memory<small>Farbe merken und nachstellen</small></a>
   <button id="imp-open" type="button">Highscores übertragen</button>
 </div>
 <div id="imp" hidden role="dialog" aria-modal="true" aria-labelledby="imp-h">
@@ -112,7 +114,7 @@ h1{font-size:28px;margin:8px 0 20px}
   document.getElementById("home").addEventListener("click", function (e) { e.preventDefault(); close(); });
 
   // Highscores aus einem Code übernehmen. Zeiten (Zahlenraster, Dice Roll, React, Time's Up): kleiner ist besser, sonst größer.
-  var LOWER = /^(zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best|timesup-best|zrz-best)/;
+  var LOWER = /^(speedgolf-best|zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best|timesup-best|zrz-best)/;
   var imp = document.getElementById("imp"), impCode = document.getElementById("imp-code"), impMsg = document.getElementById("imp-msg");
   document.getElementById("imp-open").addEventListener("click", function () { impCode.value = ""; impMsg.textContent = ""; imp.hidden = false; });
   document.getElementById("imp-close").addEventListener("click", function () { imp.hidden = true; });
