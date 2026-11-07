@@ -289,7 +289,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         ball.x += (course.hole.x - ball.x) * Math.min(1, dt * 14); ball.y += (course.hole.y - ball.y) * Math.min(1, dt * 14);
         ball.s = Math.max(0, 1 - sink / 0.25);
         if (sink >= 0.25 && pause === 0) { holes++; pause = 0.55; }
-        if (pause > 0) { pause -= dt; if (pause <= 0) { pause = 0; newCourse(); state = "run"; } }
+        if (pause > 0) { pause -= dt; if (pause <= 0) { pause = 0; newCourse(); state = "wait"; } }
       }
     }
   }
@@ -376,7 +376,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     var font = getComputedStyle(document.body).fontFamily;
     ctx.textBaseline = "middle";
     ctx.font = "800 " + Math.round(Ws * 0.1) + "px " + font; ctx.textAlign = "left";
-    ctx.fillStyle = (state === "sink" && pause > 0) || state === "idle" ? "rgba(255,255,255,0.4)" : "#fff";
+    ctx.fillStyle = state === "sink" || state === "wait" || state === "idle" ? "rgba(255,255,255,0.4)" : "#fff";
     ctx.fillText(tLeft.toFixed(1), X0, TOP);
     ctx.textAlign = "right"; ctx.font = "800 " + Math.round(Ws * 0.075) + "px " + font; ctx.fillStyle = "#7fd17f";
     ctx.fillText("⛳ " + holes, X0 + COLS * tw, TOP);
@@ -395,27 +395,27 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     requestAnimationFrame(frame);
   }
 
-  // ---------- Eingabe: irgendwo ziehen, Schuss geht entgegen der Zugrichtung ----------
+  // ---------- Eingabe: irgendwo ziehen, Schuss geht in Zugrichtung; auch während der Ball noch rollt ----------
   var drag = null;
   function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
   document.addEventListener("pointerdown", function (e) {
     if (ui(e)) return;
     e.preventDefault();
-    if (state === "done" || state === "sink" || ball.moving) return;
+    if (state !== "run" && state !== "idle" && state !== "wait") return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
     aim = { dx: 0, dy: -1, p: 0 };
   });
   document.addEventListener("pointermove", function (e) {
     if (!drag || e.pointerId !== drag.id) return;
-    var dx = (drag.x - e.clientX) / tw, dy = (drag.y - e.clientY) / th, len = Math.hypot(dx, dy);
+    var dx = (e.clientX - drag.x) / tw, dy = (e.clientY - drag.y) / th, len = Math.hypot(dx, dy);
     var p = Math.min(1, Math.hypot(drag.x - e.clientX, drag.y - e.clientY) / (MAX_DRAG * tw));
     if (len > 0.0001) aim = { dx: dx / len, dy: dy / len, p: p };
   });
   function release(e) {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
-    if (aim && aim.p > 0.06 && (state === "run" || state === "idle") && !ball.moving) {
-      if (state === "idle") { state = "run"; }
+    if (aim && aim.p > 0.06 && (state === "run" || state === "idle" || state === "wait")) {
+      state = "run";
       ball.vx = aim.dx * aim.p * VMAX; ball.vy = aim.dy * aim.p * VMAX; ball.moving = true;
     }
     aim = null;
@@ -435,7 +435,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   requestAnimationFrame(function (t) { last = t; frame(t); });
   window.__hr = {
     get s() { return { state: state, holes: holes, t: tLeft, ball: ball, course: course }; },
-    shoot: function (dx, dy, p) { var l = Math.hypot(dx, dy); if (state === "idle") state = "run"; ball.vx = dx / l * p * VMAX; ball.vy = dy / l * p * VMAX; ball.moving = true; },
+    shoot: function (dx, dy, p) { var l = Math.hypot(dx, dy); if (state === "idle" || state === "wait") state = "run"; ball.vx = dx / l * p * VMAX; ball.vy = dy / l * p * VMAX; ball.moving = true; },
     level: function (n) { holes = n; newCourse(); }
   };
 })();
