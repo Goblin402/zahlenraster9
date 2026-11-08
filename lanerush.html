@@ -52,167 +52,235 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 <script>
 (function () {
   // Aus der Aufnahme gemessen (Meterzähler): Strecke d(t) = 13,0 t + 0,475 t², also Start 13,0 m/s, +0,95 m/s pro Sekunde.
-  // Gegenverkehr: vom Auftauchen bis zum Spieler ~0,55 s (bei 17 m/s) bis ~0,40 s (bei 32 m/s).
+  // Gegenverkehr: von der Kuppe bis zum Spieler ~0,55 s (bei 17 m/s) bis ~0,40 s (bei 32 m/s); Autos tauchen hinter der Kuppe auf.
   // Abstand zwischen den Reihen (Ankunft am Spieler): ~1,5 s am Anfang, ~0,7 s bei 450 m; erste Reihe bei ~65 m.
-  // Zweierreihen erst ab ~280 m, etwa jede vierte Reihe. Spurwechsel 0,22 s.
-  var V0 = 13.0, ACC = 0.95, VMAX = 60, LANE_T = 0.22, LANE_W = 3, ZP = 7, ZMAX = 25;
-  var FIRST_M = 65, PAIR_FROM = 280, PAIR_P = 0.25;
-  function approach(v) { return 0.85 * (v + 20.8); } // Tiefeneinheiten pro Sekunde
-  function rowGap(v) { return Math.max(0.5, 2.55 - 0.057 * v) * (0.88 + Math.random() * 0.24); } // Sekunden
+  // Zweierreihen erst ab ~280 m, etwa jede vierte Reihe. Spurwechsel 0,22 s. Spurabstand am Spieler 190/585 Bildbreite,
+  // Kuppe bei 66 % Höhe, Spieler-Unterkante bei 89 %, Spurabstand an der Kuppe ~0,4x so groß wie am Spieler.
+  var V0 = 13.0, ACC = 0.95, VMAX = 60, LANE_T = 0.22, LANE_W = 3, ZP = 7, ZC = 18, ZS = 24, ZFAR = 30;
+  var FIRST_M = 65, PAIR_FROM = 280, PAIR_P = 0.25, CAMH = 5.0, Z1 = 7.6, DASH_P = 7, DASH_L = 2.6;
+  function approach(v) { return (ZC - ZP) / 21.4 * (v + 20.8); }
+  function rowGap(v) { return Math.max(0.5, 2.55 - 0.057 * v) * (0.88 + Math.random() * 0.24); }
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
-  var Ws, Hs, dpr, f, yv, cx, yHor;
+  var Ws, Hs, dpr, f, yv, cx, HH, yCrest;
   function layout() {
     dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight;
     cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr);
-    // Straße: am Spieler ~1,1 Bildbreiten breit, Spieler-Unterkante bei 86 % Höhe, hinterer Rand bei 66 %
-    f = 0.325 * Ws * ZP / LANE_W; /* Spurabstand am Spieler: 190 von 585 px */ cx = Ws / 2; yHor = Hs * 0.66;
-    var k = (Hs * 0.89 - yHor) / (1 / ZP - 1 / ZMAX); CAMH = k / f; yv = yHor - k / ZMAX;
+    f = 0.325 * Ws * ZP / LANE_W; cx = Ws / 2;
+    yv = Hs * 0.89 - f * CAMH / ZP;
+    // Hügelhöhe so, dass die Kuppe bei 66 % Bildhöhe liegt
+    HH = CAMH - (Hs * 0.66 - yv) * ZC / f;
   }
-  var CAMH = 4;
   window.addEventListener("resize", layout); layout();
+  function sm(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+  function hAt(z) { if (z <= Z1) return 0; if (z <= ZC) return HH * sm((z - Z1) / (ZC - Z1)); return HH - (z - ZC) * 0.55; }
   function P(x, y, z) { return [cx + f * x / z, yv + f * (CAMH - y) / z]; }
 
-  var state = "idle", dist = 0, t = 0, v = V0, lane = 1, from = 1, lt = 1, obs = [], nextZ = 0, gen = 0, crashT = 0, best = 0, lastFree = [0, 1, 2], scroll = 0;
+  var state = "idle", dist = 0, t = 0, v = V0, lane = 1, from = 1, lt = 1, obs = [], gen = 0, crashT = 0, best = 0, lastFree = [0, 1, 2], road = 0;
+  var spin = null;
   try { best = parseInt(localStorage.getItem("lanerush-best"), 10) || 0; } catch (e) {}
   var bestEl = document.getElementById("best");
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
-  var COLORS = ["#d8584a", "#e8a33a", "#4f8fd8", "#b06ad8", "#e6e1d3", "#58b88a"];
+  var COLORS = ["#d4553f", "#e58a2e", "#e9dcc0", "#3fa36a", "#9a5bc0", "#d9c34a"];
   function laneX(l) { return (l - 1) * LANE_W; }
-  function playerX() { var p = Math.min(1, lt / LANE_T); p = p * p * (3 - 2 * p); return laneX(from) + (laneX(lane) - laneX(from)) * p; }
+  function laneP() { var p = Math.min(1, lt / LANE_T); return p * p * (3 - 2 * p); }
+  function playerX() { return laneX(from) + (laneX(lane) - laneX(from)) * laneP(); }
 
   var spawnIn = 0, lastGap = 9;
   function spawnRow(z) {
-    var two = dist >= PAIR_FROM && Math.random() < PAIR_P, blocked;
-    var gapT = lastGap;
+    var two = dist >= PAIR_FROM && Math.random() < PAIR_P, blocked, gapT = lastGap;
     for (var tries = 0; tries < 20; tries++) {
       if (two) { var free = Math.floor(Math.random() * 3); blocked = [0, 1, 2].filter(function (l) { return l !== free; }); }
       else blocked = [Math.floor(Math.random() * 3)];
       var freeL = [0, 1, 2].filter(function (l) { return blocked.indexOf(l) < 0; });
-      // erreichbar? kurze Abstände nur, wenn eine freie Spur gleich bleibt oder benachbart ist
       var ok = freeL.some(function (l) { return lastFree.some(function (m) { return m === l || (Math.abs(m - l) === 1 && gapT > 0.35) || (Math.abs(m - l) === 2 && gapT > 0.6); }); });
       if (ok) break;
     }
     blocked.forEach(function (l) {
       var van = Math.random() < 0.3;
-      obs.push({ l: l, z: z, len: van ? 4.6 : 3.4, h: van ? 1.9 : 1.25, w: van ? 2.0 : 1.8, col: COLORS[Math.floor(Math.random() * COLORS.length)], van: van });
+      obs.push({ l: l, z: z, van: van, len: van ? 5.0 : 3.9, w: van ? 2.6 : 2.5, h: van ? 2.5 : 1.75,
+        col: van ? ["#e9dcc0", "#d4553f", "#3fa36a"][Math.floor(Math.random() * 3)] : COLORS[Math.floor(Math.random() * COLORS.length)] });
     });
     lastFree = [0, 1, 2].filter(function (l) { return blocked.indexOf(l) < 0; });
   }
   function reset() {
-    gen++; state = "idle"; dist = 0; t = 0; v = V0; lane = from = 1; lt = 1; obs = []; lastFree = [0, 1, 2];
+    gen++; state = "idle"; dist = 0; t = 0; v = V0; lane = from = 1; lt = 1; obs = []; lastFree = [0, 1, 2]; spin = null;
     document.getElementById("result").hidden = true;
-    // erste Reihe so, dass sie bei ~65 m ankommt
     var tA = (-V0 + Math.sqrt(V0 * V0 + 2 * ACC * FIRST_M)) / ACC, vA = V0 + ACC * tA;
-    spawnIn = tA - (ZMAX - ZP) / approach(vA); lastGap = 9;
+    spawnIn = tA - (ZS - ZP) / approach(vA); lastGap = 9;
   }
-  function crash() {
+  function crash(o) {
     state = "crash"; crashT = 0;
+    var px = playerX(), side = px === laneX(o.l) ? (Math.random() < 0.5 ? -1 : 1) : (px < laneX(o.l) ? -1 : 1);
+    spin = { x: px, z: ZP, dir: side, ang: 0, w: 7.5 * side };
     var sc = Math.floor(dist), rec = sc > best;
     if (rec) { best = sc; try { localStorage.setItem("lanerush-best", String(best)); } catch (e) {} showBest(); }
     document.getElementById("rec").hidden = !rec;
     document.getElementById("pts").textContent = sc + " Pts";
-    var g = gen; setTimeout(function () { if (g === gen) { state = "done"; document.getElementById("result").hidden = false; } }, 1100);
+    var g = gen; setTimeout(function () { if (g === gen) { state = "done"; document.getElementById("result").hidden = false; } }, 1600);
   }
   function step(dt) {
     t += dt; v = Math.min(VMAX, V0 + ACC * t);
-    var d = v * dt; dist += d; scroll = (scroll + d * 0.85) % 6; lt += dt;
+    var d = v * dt; dist += d; lt += dt;
+    road += (ZC - ZP) / 21.4 * v * dt;
     var u = approach(v) * dt;
     obs.forEach(function (o) { o.z -= u; });
     spawnIn -= dt;
-    if (spawnIn <= 0) { spawnRow(ZMAX + 0.5); var g = rowGap(v); lastGap = g; spawnIn += g; }
+    if (spawnIn <= 0) { spawnRow(ZS); var g = rowGap(v); lastGap = g; spawnIn += g; }
     var px = playerX();
     for (var i = 0; i < obs.length; i++) {
       var o = obs[i];
-      if (o.z < ZP + 2.0 && o.z + o.len > ZP - 0.2 && Math.abs(px - laneX(o.l)) < (o.w + 1.7) / 2 - 0.15) { crash(); return; }
+      if (o.z < ZP + PLAYER.len - 0.6 && o.z + o.len > ZP + 0.3 && Math.abs(px - laneX(o.l)) < (o.w + PLAYER.w) / 2 - 0.35) { crash(o); return; }
     }
-    obs = obs.filter(function (o) { return o.z + o.len > 1.2; });
+    obs = obs.filter(function (o) { return o.z + o.len > 1.5; });
   }
 
-  // ---------- Zeichnen ----------
-  function quad(a, b, c, d, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill(); }
+  // ---------- Zeichnen (Maler-Algorithmus: hinten nach vorne, die Kuppe verdeckt dahinterliegende Autos) ----------
+  function poly(pts, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fill(); }
   function shade(hex, k) { var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; function c(x) { return Math.max(0, Math.min(255, Math.round(x * k))); } return "rgb(" + c(r) + "," + c(g) + "," + c(b) + ")"; }
-  // Kiste: x-Mitte, z (vordere Kante, zum Spieler), Breite, Länge, Höhe
-  function box(x, z, w, l, h, col, y0) {
-    y0 = y0 || 0;
-    var x1 = x - w / 2, x2 = x + w / 2, zf = Math.max(0.6, z), zb = z + l;
-    var fbl = P(x1, y0, zf), fbr = P(x2, y0, zf), ftl = P(x1, y0 + h, zf), ftr = P(x2, y0 + h, zf);
-    var btl = P(x1, y0 + h, zb), btr = P(x2, y0 + h, zb), bbl = P(x1, y0, zb), bbr = P(x2, y0, zb);
-    if (x1 > 0) quad(fbl, ftl, btl, bbl, shade(col, 0.62));
-    if (x2 < 0) quad(fbr, ftr, btr, bbr, shade(col, 0.62));
-    quad(ftl, ftr, btr, btl, shade(col, 1.08));
-    quad(fbl, fbr, ftr, ftl, shade(col, 0.85));
+  // Quader: Mitte x, vordere Kante z (zur Kamera), Breite w, Länge l, Unterkante yf (vorne) / yb (hinten), Höhe h
+  function box(x, z, w, l, h, col, yf, yb) {
+    var x1 = x - w / 2, x2 = x + w / 2, zf = Math.max(0.7, z), zb = z + l;
+    var A = P(x1, yf, zf), B = P(x2, yf, zf), C = P(x2, yf + h, zf), D = P(x1, yf + h, zf);
+    var E = P(x1, yb, zb), F = P(x2, yb, zb), G = P(x2, yb + h, zb), Hh = P(x1, yb + h, zb);
+    if (x1 > 0) poly([A, D, Hh, E], shade(col, 0.66));
+    if (x2 < 0) poly([B, C, G, F], shade(col, 0.66));
+    if (D[1] > Hh[1]) poly([D, C, G, Hh], shade(col, 1.1));
+    poly([A, B, C, D], shade(col, 0.9));
+    return [A, B, C, D];
   }
-  function car(x, z, o, roll) {
-    var w = o.w, l = o.len, h = o.h;
-    ctx.save();
-    if (roll) { var c = P(x, 0, z); ctx.translate(c[0], c[1]); ctx.rotate(roll); ctx.translate(-c[0], -c[1]); }
-    var s = P(x, 0, z), s2 = P(x + w / 2, 0, z);
-    ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(s[0], s[1], Math.abs(s2[0] - s[0]) * 1.05, Math.abs(s2[0] - s[0]) * 0.18, 0, 0, 7); ctx.fill();
-    box(x, z, w, l, h * 0.55, o.col, 0.15);
-    if (o.van) box(x, z + 0.25, w * 0.96, l - 0.5, h * 0.45, "#efe9dc", 0.15 + h * 0.55);
-    else box(x, z + l * 0.3, w * 0.8, l * 0.45, h * 0.42, o.col, 0.15 + h * 0.55);
-    // Lichter vorne
-    var a = P(x - w * 0.33, 0.45, z), b = P(x + w * 0.33, 0.45, z), r = Math.max(1.5, (P(x + 0.2, 0, z)[0] - P(x, 0, z)[0]));
-    ctx.fillStyle = o.lights || "#fff3b0"; ctx.beginPath(); ctx.arc(a[0], a[1], r, 0, 7); ctx.arc(b[0], b[1], r, 0, 7); ctx.fill();
-    ctx.restore();
+  function vehicle(x, z, o, facing) {
+    var yf = hAt(z), yb = hAt(z + o.len), w = o.w, l = o.len, h = o.h;
+    var s = P(x, yf, z), s2 = P(x + w / 2, yf, z), rw = Math.abs(s2[0] - s[0]);
+    ctx.fillStyle = "rgba(20,8,10,0.28)"; ctx.beginPath(); ctx.ellipse(s[0], s[1] - rw * 0.05, rw * 1.08, rw * 0.16, 0, 0, 7); ctx.fill();
+    // Räder
+    var wh = 0.55;
+    box(x - w * 0.42, z + 0.35, w * 0.16, l - 0.7, wh, "#1c1416", yf, yb);
+    box(x + w * 0.42, z + 0.35, w * 0.16, l - 0.7, wh, "#1c1416", yf, yb);
+    var bodyH = o.van ? h * 0.42 : h * 0.5, base = 0.28;
+    var front = box(x, z, w * 0.94, l, bodyH, o.col, yf + base, yb + base);
+    // Kabine
+    var cabCol = o.van ? "#efe6d2" : o.col;
+    var cz = o.van ? z + 0.2 : z + l * 0.28, cl = o.van ? l - 0.4 : l * 0.46;
+    var cf = box(x, cz, w * (o.van ? 0.9 : 0.78), cl, h - bodyH - base, cabCol, yf + base + bodyH, yb + base + bodyH);
+    // Scheibe
+    var A = cf[0], B = cf[1], C = cf[2], D = cf[3], iw = 0.12, ih = 0.2;
+    function lerp(p, q, k) { return [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k]; }
+    var a1 = lerp(lerp(A, B, iw), lerp(D, C, iw), ih), b1 = lerp(lerp(A, B, 1 - iw), lerp(D, C, 1 - iw), ih), c1 = lerp(lerp(A, B, 1 - iw), lerp(D, C, 1 - iw), 0.82), d1 = lerp(lerp(A, B, iw), lerp(D, C, iw), 0.82);
+    poly([a1, b1, c1, d1], "#2b2f3a");
+    // Lichter
+    var lA = front[0], lB = front[1], lC = front[2], lD = front[3];
+    var r = Math.max(1.4, rw * 0.09), ly = 0.5;
+    var p1 = lerp(lerp(lA, lB, 0.17), lerp(lD, lC, 0.17), ly), p2 = lerp(lerp(lA, lB, 0.83), lerp(lD, lC, 0.83), ly);
+    ctx.fillStyle = facing ? "#fff1b8" : "#ff6a4a"; ctx.beginPath(); ctx.arc(p1[0], p1[1], r, 0, 7); ctx.arc(p2[0], p2[1], r, 0, 7); ctx.fill();
   }
-  var PLAYER = { w: 1.8, len: 3.6, h: 1.3, col: "#2fbfa0", lights: "#ff6b5a" };
+  var PLAYER = { w: 2.55, len: 3.9, h: 1.8, col: "#2f6fd0", van: false };
+  var STRIPS = (function () { var z = [], a = 0.8; while (a < ZFAR) { var dz = a < 10 ? 0.35 : a < 20 ? 0.22 : 0.3; z.push([a, Math.min(ZFAR, a + dz)]); a += dz; } return z; })();
+  function sky() {
+    var g = ctx.createLinearGradient(0, 0, 0, Hs * 0.68);
+    g.addColorStop(0, "#3d2a73"); g.addColorStop(0.55, "#7a4a9a"); g.addColorStop(1, "#d77a88");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, Ws, Hs);
+    // Sonne (seitlich, eigene Optik)
+    var sx = Ws * 0.78, sy = Hs * 0.47, sr = Ws * 0.06;
+    ctx.fillStyle = "#ffd9a0"; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, 7); ctx.fill();
+    // Wolken (driften langsam)
+    var drift = (performance.now() / 1000 * 4) % (Ws * 1.4);
+    [[0.18, 0.4, 0.9], [0.55, 0.36, 1.15], [0.86, 0.42, 0.8]].forEach(function (c) {
+      var x = ((c[0] * Ws + drift * c[2]) % (Ws * 1.3)) - Ws * 0.15, y = Hs * c[1], s2 = Ws * 0.1 * c[2];
+      ctx.fillStyle = "rgba(255,226,214,0.75)"; ctx.beginPath();
+      ctx.arc(x - s2 * 0.45, y, s2 * 0.28, 0, 7); ctx.arc(x, y - s2 * 0.12, s2 * 0.4, 0, 7); ctx.arc(x + s2 * 0.45, y + s2 * 0.02, s2 * 0.26, 0, 7); ctx.fill();
+    });
+    // Dünenketten am Horizont
+    var base = Hs * 0.668;
+    function dunes(amp, yTop, ph, col) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, base);
+      for (var i = 0; i <= 24; i++) { var x = Ws * i / 24; ctx.lineTo(x, yTop + amp * (0.5 + 0.5 * Math.sin(i * 0.9 + ph)) ); }
+      ctx.lineTo(Ws, base); ctx.closePath(); ctx.fill();
+    }
+    dunes(Hs * 0.03, Hs * 0.6, 0.4, "#a7608a");
+    dunes(Hs * 0.022, Hs * 0.63, 2.1, "#c27a7e");
+  }
+  var ZS_SAMPLES = (function () { var z = [], a = 0.8; while (a < ZC) { z.push(a); a += a < 10 ? 0.25 : 0.15; } z.push(ZC); return z; })();
+  function band(x0, x1, col) {
+    var pts = [];
+    ZS_SAMPLES.forEach(function (z) { pts.push(P(x0, hAt(z), z)); });
+    for (var i = ZS_SAMPLES.length - 1; i >= 0; i--) { var z = ZS_SAMPLES[i]; pts.push(P(x1, hAt(z), z)); }
+    poly(pts, col);
+  }
+  function ground() {
+    var yc = P(0, hAt(ZC), ZC)[1];
+    ctx.fillStyle = "#d9a85e"; ctx.fillRect(0, yc, Ws, Hs - yc);
+    var RW = 1.5 * LANE_W + 0.4;
+    band(-RW - 0.28, RW + 0.28, "#f1ece4");
+    band(-RW, RW, "#33282b");
+    // Mittelstreifen
+    var start = -((road % DASH_P) + DASH_P) % DASH_P;
+    for (var z = start; z < ZC; z += DASH_P) {
+      var z0 = Math.max(0.8, z), z1 = Math.min(ZC, z + DASH_L);
+      if (z1 <= z0) continue;
+      [-0.5, 0.5].forEach(function (k) {
+        var x = k * LANE_W, dw = 0.16, pts = [], n = 6, i;
+        for (i = 0; i <= n; i++) { var zz = z0 + (z1 - z0) * i / n; pts.push(P(x - dw, hAt(zz), zz)); }
+        for (i = n; i >= 0; i--) { var zz2 = z0 + (z1 - z0) * i / n; pts.push(P(x + dw, hAt(zz2), zz2)); }
+        poly(pts, "#ecd08a");
+      });
+    }
+  }
   function draw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var g = ctx.createLinearGradient(0, 0, 0, yHor);
-    g.addColorStop(0, "#1a1430"); g.addColorStop(0.7, "#3b2558"); g.addColorStop(1, "#7a3d6a");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, Ws, yHor + 1);
-    // Mond + Hügel
-    ctx.fillStyle = "rgba(255,240,210,0.9)"; ctx.beginPath(); ctx.arc(Ws * 0.72, yHor - Hs * 0.17, Ws * 0.07, 0, 7); ctx.fill();
-    ctx.fillStyle = "#2a1c3f"; ctx.beginPath(); ctx.moveTo(0, yHor);
-    for (var i = 0; i <= 12; i++) { var xx = Ws * i / 12; ctx.lineTo(xx, yHor - Hs * (0.035 + 0.03 * Math.abs(Math.sin(i * 1.7)))); }
-    ctx.lineTo(Ws, yHor); ctx.closePath(); ctx.fill();
-    // Boden
-    ctx.fillStyle = "#211a2c"; ctx.fillRect(0, yHor, Ws, Hs - yHor);
-    // Straße
-    var RW = 1.5 * LANE_W;
-    var a = P(-RW, 0, ZMAX), b = P(RW, 0, ZMAX), c = P(RW, 0, 0.8), d = P(-RW, 0, 0.8);
-    quad(a, b, c, d, "#36303f");
-    // Randlinien
-    [-1, 1].forEach(function (sgn) { quad(P(sgn * RW, 0, ZMAX), P(sgn * (RW - 0.25), 0, ZMAX), P(sgn * (RW - 0.25), 0, 0.8), P(sgn * RW, 0, 0.8), "#cfc8da"); });
-    // Mittellinien (gestrichelt, laufen mit)
-    [-0.5, 0.5].forEach(function (k) {
-      var x = k * LANE_W;
-      for (var z = ZMAX - scroll; z > 0.8; z -= 6) {
-        var z2 = Math.max(0.8, z - 2.6); if (z > ZMAX) continue;
-        quad(P(x - 0.12, 0, z), P(x + 0.12, 0, z), P(x + 0.12, 0, z2), P(x - 0.12, 0, z2), "#e8c85c");
-      }
-    });
-    // Fahrzeuge von hinten nach vorne
-    var list = obs.slice().sort(function (p, q) { return (q.z + q.len / 2) - (p.z + p.len / 2); });
-    var px = playerX(), drawn = false;
-    var roll = lt < LANE_T ? Math.sin(Math.PI * lt / LANE_T) * 0.09 * (lane > from ? 1 : -1) : 0;
+    sky();
+    ground();
+    var yc = P(0, hAt(ZC), ZC)[1];
+    var list = obs.slice().sort(function (a, b) { return b.z - a.z; }), pDone = false;
     list.forEach(function (o) {
-      if (!drawn && o.z + o.len / 2 < ZP + PLAYER.len / 2) { car(px, ZP, PLAYER, roll); drawn = true; }
-      if (o.z < ZMAX && o.z > ZP - 2.5) car(laneX(o.l), o.z, o, 0);
+      if (!pDone && o.z < ZP) { drawPlayer(); pDone = true; }
+      if (o.z <= 1.2) return;
+      if (o.z > ZC - 0.2) {
+        // hinter der Kuppe: nur der Teil über der Kuppe ist sichtbar
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, Ws, yc + 0.5); ctx.clip();
+        vehicle(laneX(o.l), o.z, o, true); ctx.restore();
+      } else vehicle(laneX(o.l), o.z, o, true);
     });
-    if (!drawn) car(px, ZP, PLAYER, roll);
-    // Nebel am Horizont
-    var fg = ctx.createLinearGradient(0, yHor - 2, 0, yHor + Hs * 0.05); fg.addColorStop(0, "rgba(122,61,106,0.9)"); fg.addColorStop(1, "rgba(122,61,106,0)");
-    ctx.fillStyle = fg; ctx.fillRect(0, yHor - 2, Ws, Hs * 0.05 + 2);
-    if (state === "crash" || state === "done") { ctx.fillStyle = "rgba(220,60,60," + (0.35 * Math.max(0, 1 - crashT)) + ")"; ctx.fillRect(0, 0, Ws, Hs); }
+    if (!pDone) drawPlayer();
     // Meter
-    var font = getComputedStyle(document.body).fontFamily;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = state === "idle" ? "rgba(255,255,255,0.45)" : "#fff8ec";
-    ctx.font = "800 " + Math.round(Ws * 0.15) + "px " + font;
-    ctx.fillText(Math.floor(dist) + " m", Ws / 2, Hs * 0.2);
-    if (state === "idle") {
-      ctx.font = "800 " + Math.round(Math.min(Ws * 0.06, 26)) + "px " + font; ctx.fillStyle = "#fff";
-      ctx.fillText("Links / rechts tippen", Ws / 2, Hs * 0.42);
+    var font = getComputedStyle(document.body).fontFamily, my = Hs * 0.3;
+    var red = (state === "crash" || state === "done") && crashT < 0.45;
+    ctx.textBaseline = "alphabetic";
+    var num = String(Math.floor(dist)), fs = Math.round(Ws * 0.15), fs2 = Math.round(Ws * 0.055);
+    ctx.font = "800 " + fs + "px " + font; var w1 = ctx.measureText(num).width;
+    ctx.font = "800 " + fs2 + "px " + font; var w2 = ctx.measureText("M").width;
+    var x0 = Ws / 2 - (w1 + w2 + 6) / 2;
+    ctx.textAlign = "left";
+    ctx.font = "800 " + fs + "px " + font; ctx.fillStyle = "rgba(60,30,70,0.55)"; ctx.fillText(num, x0, my + 4);
+    ctx.fillStyle = state === "idle" ? "rgba(255,248,236,0.55)" : "#fff6e6"; ctx.fillText(num, x0, my);
+    ctx.font = "800 " + fs2 + "px " + font; ctx.fillStyle = "rgba(60,30,70,0.55)"; ctx.fillText("M", x0 + w1 + 6, my + 3);
+    ctx.fillStyle = state === "idle" ? "rgba(255,248,236,0.55)" : "#fff6e6"; ctx.fillText("M", x0 + w1 + 6, my);
+    if (state === "crash" || state === "done") {
+      var a = Math.max(0, 0.42 * (1 - crashT / 0.4));
+      if (a > 0) { ctx.fillStyle = "rgba(225,40,50," + a + ")"; ctx.fillRect(0, 0, Ws, Hs); }
     }
+  }
+  function drawPlayer() {
+    var x = playerX(), ang = 0, dx = 0, dy = 0;
+    if (spin) {
+      var tt = Math.min(crashT, 1.4);
+      ang = spin.dir * (tt * 7.5 - tt * tt * 1.9);
+      dx = spin.dir * f * 0.9 * (1 - Math.exp(-tt * 3)) / ZP;
+      dy = -Math.sin(Math.min(1, tt / 0.5) * Math.PI) * Hs * 0.03;
+    } else if (lt < LANE_T) {
+      ang = Math.sin(Math.PI * Math.min(1, lt / LANE_T)) * 0.26 * (lane > from ? 1 : -1);
+    }
+    var c = P(x, 0, ZP + PLAYER.len / 2);
+    ctx.save(); ctx.translate(c[0] + dx, c[1] + dy); ctx.rotate(ang); ctx.translate(-c[0], -c[1]);
+    vehicle(x, ZP, PLAYER, false);
+    ctx.restore();
   }
   var last = 0;
   function frame(tm) {
     requestAnimationFrame(frame);
     var dt = Math.min(0.05, (tm - last) / 1000); last = tm;
     if (state === "run") { var n = Math.ceil(dt / 0.004); for (var i = 0; i < n && state === "run"; i++) step(dt / n); }
-    else if (state === "crash") crashT += dt;
+    else if (state === "crash" || state === "done") crashT += dt;
     draw();
   }
   function move(dir) {
