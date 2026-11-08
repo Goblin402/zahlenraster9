@@ -1,0 +1,286 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Lane Rush</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Lane Rush: 3 Spuren, Autos ausweichen. Tippen links/rechts oder wischen = Spurwechsel.
+   Gemessen: Tempo ~13,5 m/s + 1 m/s pro Sekunde, Spurwechsel ~0,3 s, Punkte = Meter. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body { background: #17131f; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(10, 4, 22, 0.6); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(8, 4, 16, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  var V0 = 13.5, ACC = 1.0, VMAX = 48, LANE_T = 0.28, LANE_W = 3, ZP = 7, ZMAX = 25;
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var Ws, Hs, dpr, f, yv, cx, yHor;
+  function layout() {
+    dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight;
+    cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr);
+    // Straße: am Spieler ~1,1 Bildbreiten breit, Spieler-Unterkante bei 86 % Höhe, hinterer Rand bei 66 %
+    f = 1.1 * Ws * ZP / (3 * LANE_W); cx = Ws / 2; yHor = Hs * 0.66;
+    var k = (Hs * 0.86 - yHor) / (1 / ZP - 1 / ZMAX); CAMH = k / f; yv = yHor - k / ZMAX;
+  }
+  var CAMH = 4;
+  window.addEventListener("resize", layout); layout();
+  function P(x, y, z) { return [cx + f * x / z, yv + f * (CAMH - y) / z]; }
+
+  var state = "idle", dist = 0, t = 0, v = V0, lane = 1, from = 1, lt = 1, obs = [], nextZ = 0, gen = 0, crashT = 0, best = 0, lastFree = [0, 1, 2], scroll = 0;
+  try { best = parseInt(localStorage.getItem("lanerush-best"), 10) || 0; } catch (e) {}
+  var bestEl = document.getElementById("best");
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  var COLORS = ["#d8584a", "#e8a33a", "#4f8fd8", "#b06ad8", "#e6e1d3", "#58b88a"];
+  function laneX(l) { return (l - 1) * LANE_W; }
+  function playerX() { var p = Math.min(1, lt / LANE_T); p = p * p * (3 - 2 * p); return laneX(from) + (laneX(lane) - laneX(from)) * p; }
+
+  function spawnRow(z) {
+    var two = Math.random() < Math.min(0.45, 0.18 + dist / 2500), blocked;
+    var gapT = (z - (obs.length ? obs[obs.length - 1].z : 0)) / v;
+    for (var tries = 0; tries < 20; tries++) {
+      if (two) { var free = Math.floor(Math.random() * 3); blocked = [0, 1, 2].filter(function (l) { return l !== free; }); }
+      else blocked = [Math.floor(Math.random() * 3)];
+      var freeL = [0, 1, 2].filter(function (l) { return blocked.indexOf(l) < 0; });
+      // erreichbar? kurze Abstände nur, wenn eine freie Spur gleich bleibt oder benachbart ist
+      var ok = freeL.some(function (l) { return lastFree.some(function (m) { return m === l || (Math.abs(m - l) === 1 && gapT > 0.5) || (Math.abs(m - l) === 2 && gapT > 0.9); }); });
+      if (ok) break;
+    }
+    blocked.forEach(function (l) {
+      var van = Math.random() < 0.3;
+      obs.push({ l: l, z: z + Math.random() * 0.6, len: van ? 4.6 : 3.4, h: van ? 1.9 : 1.25, w: van ? 2.0 : 1.8, col: COLORS[Math.floor(Math.random() * COLORS.length)], van: van });
+    });
+    lastFree = [0, 1, 2].filter(function (l) { return blocked.indexOf(l) < 0; });
+  }
+  function reset() {
+    gen++; state = "idle"; dist = 0; t = 0; v = V0; lane = from = 1; lt = 1; obs = []; lastFree = [0, 1, 2];
+    document.getElementById("result").hidden = true;
+    nextZ = ZMAX + 4;
+  }
+  function crash() {
+    state = "crash"; crashT = 0;
+    var sc = Math.floor(dist), rec = sc > best;
+    if (rec) { best = sc; try { localStorage.setItem("lanerush-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = sc + " Pts";
+    var g = gen; setTimeout(function () { if (g === gen) { state = "done"; document.getElementById("result").hidden = false; } }, 1100);
+  }
+  function step(dt) {
+    t += dt; v = Math.min(VMAX, V0 + ACC * t);
+    var d = v * dt; dist += d; scroll = (scroll + d) % 6; lt += dt;
+    obs.forEach(function (o) { o.z -= d; });
+    nextZ -= d;
+    while (nextZ < ZMAX + 6) { spawnRow(nextZ); nextZ += Math.max(9, v * (0.5 + Math.random() * 0.4)); }
+    var px = playerX();
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (o.z < ZP + 2.0 && o.z + o.len > ZP - 0.2 && Math.abs(px - laneX(o.l)) < (o.w + 1.7) / 2 - 0.15) { crash(); return; }
+    }
+    obs = obs.filter(function (o) { return o.z + o.len > 1.2; });
+  }
+
+  // ---------- Zeichnen ----------
+  function quad(a, b, c, d, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill(); }
+  function shade(hex, k) { var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; function c(x) { return Math.max(0, Math.min(255, Math.round(x * k))); } return "rgb(" + c(r) + "," + c(g) + "," + c(b) + ")"; }
+  // Kiste: x-Mitte, z (vordere Kante, zum Spieler), Breite, Länge, Höhe
+  function box(x, z, w, l, h, col, y0) {
+    y0 = y0 || 0;
+    var x1 = x - w / 2, x2 = x + w / 2, zf = Math.max(0.6, z), zb = z + l;
+    var fbl = P(x1, y0, zf), fbr = P(x2, y0, zf), ftl = P(x1, y0 + h, zf), ftr = P(x2, y0 + h, zf);
+    var btl = P(x1, y0 + h, zb), btr = P(x2, y0 + h, zb), bbl = P(x1, y0, zb), bbr = P(x2, y0, zb);
+    if (x1 > 0) quad(fbl, ftl, btl, bbl, shade(col, 0.62));
+    if (x2 < 0) quad(fbr, ftr, btr, bbr, shade(col, 0.62));
+    quad(ftl, ftr, btr, btl, shade(col, 1.08));
+    quad(fbl, fbr, ftr, ftl, shade(col, 0.85));
+  }
+  function car(x, z, o, roll) {
+    var w = o.w, l = o.len, h = o.h;
+    ctx.save();
+    if (roll) { var c = P(x, 0, z); ctx.translate(c[0], c[1]); ctx.rotate(roll); ctx.translate(-c[0], -c[1]); }
+    var s = P(x, 0, z), s2 = P(x + w / 2, 0, z);
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(s[0], s[1], Math.abs(s2[0] - s[0]) * 1.05, Math.abs(s2[0] - s[0]) * 0.18, 0, 0, 7); ctx.fill();
+    box(x, z, w, l, h * 0.55, o.col, 0.15);
+    if (o.van) box(x, z + 0.25, w * 0.96, l - 0.5, h * 0.45, "#efe9dc", 0.15 + h * 0.55);
+    else box(x, z + l * 0.3, w * 0.8, l * 0.45, h * 0.42, o.col, 0.15 + h * 0.55);
+    // Lichter vorne
+    var a = P(x - w * 0.33, 0.45, z), b = P(x + w * 0.33, 0.45, z), r = Math.max(1.5, (P(x + 0.2, 0, z)[0] - P(x, 0, z)[0]));
+    ctx.fillStyle = o.lights || "#fff3b0"; ctx.beginPath(); ctx.arc(a[0], a[1], r, 0, 7); ctx.arc(b[0], b[1], r, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  var PLAYER = { w: 1.8, len: 3.6, h: 1.3, col: "#2fbfa0", lights: "#ff6b5a" };
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var g = ctx.createLinearGradient(0, 0, 0, yHor);
+    g.addColorStop(0, "#1a1430"); g.addColorStop(0.7, "#3b2558"); g.addColorStop(1, "#7a3d6a");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, Ws, yHor + 1);
+    // Mond + Hügel
+    ctx.fillStyle = "rgba(255,240,210,0.9)"; ctx.beginPath(); ctx.arc(Ws * 0.72, yHor - Hs * 0.17, Ws * 0.07, 0, 7); ctx.fill();
+    ctx.fillStyle = "#2a1c3f"; ctx.beginPath(); ctx.moveTo(0, yHor);
+    for (var i = 0; i <= 12; i++) { var xx = Ws * i / 12; ctx.lineTo(xx, yHor - Hs * (0.035 + 0.03 * Math.abs(Math.sin(i * 1.7)))); }
+    ctx.lineTo(Ws, yHor); ctx.closePath(); ctx.fill();
+    // Boden
+    ctx.fillStyle = "#211a2c"; ctx.fillRect(0, yHor, Ws, Hs - yHor);
+    // Straße
+    var RW = 1.5 * LANE_W;
+    var a = P(-RW, 0, ZMAX), b = P(RW, 0, ZMAX), c = P(RW, 0, 0.8), d = P(-RW, 0, 0.8);
+    quad(a, b, c, d, "#36303f");
+    // Randlinien
+    [-1, 1].forEach(function (sgn) { quad(P(sgn * RW, 0, ZMAX), P(sgn * (RW - 0.25), 0, ZMAX), P(sgn * (RW - 0.25), 0, 0.8), P(sgn * RW, 0, 0.8), "#cfc8da"); });
+    // Mittellinien (gestrichelt, laufen mit)
+    [-0.5, 0.5].forEach(function (k) {
+      var x = k * LANE_W;
+      for (var z = ZMAX - scroll; z > 0.8; z -= 6) {
+        var z2 = Math.max(0.8, z - 2.6); if (z > ZMAX) continue;
+        quad(P(x - 0.12, 0, z), P(x + 0.12, 0, z), P(x + 0.12, 0, z2), P(x - 0.12, 0, z2), "#e8c85c");
+      }
+    });
+    // Fahrzeuge von hinten nach vorne
+    var list = obs.slice().sort(function (p, q) { return (q.z + q.len / 2) - (p.z + p.len / 2); });
+    var px = playerX(), drawn = false;
+    var roll = lt < LANE_T ? Math.sin(Math.PI * lt / LANE_T) * 0.09 * (lane > from ? 1 : -1) : 0;
+    list.forEach(function (o) {
+      if (!drawn && o.z + o.len / 2 < ZP + PLAYER.len / 2) { car(px, ZP, PLAYER, roll); drawn = true; }
+      if (o.z < ZMAX && o.z > ZP - 2.5) car(laneX(o.l), o.z, o, 0);
+    });
+    if (!drawn) car(px, ZP, PLAYER, roll);
+    // Nebel am Horizont
+    var fg = ctx.createLinearGradient(0, yHor - 2, 0, yHor + Hs * 0.05); fg.addColorStop(0, "rgba(122,61,106,0.9)"); fg.addColorStop(1, "rgba(122,61,106,0)");
+    ctx.fillStyle = fg; ctx.fillRect(0, yHor - 2, Ws, Hs * 0.05 + 2);
+    if (state === "crash" || state === "done") { ctx.fillStyle = "rgba(220,60,60," + (0.35 * Math.max(0, 1 - crashT)) + ")"; ctx.fillRect(0, 0, Ws, Hs); }
+    // Meter
+    var font = getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = state === "idle" ? "rgba(255,255,255,0.45)" : "#fff8ec";
+    ctx.font = "800 " + Math.round(Ws * 0.15) + "px " + font;
+    ctx.fillText(Math.floor(dist) + " m", Ws / 2, Hs * 0.2);
+    if (state === "idle") {
+      ctx.font = "800 " + Math.round(Math.min(Ws * 0.06, 26)) + "px " + font; ctx.fillStyle = "#fff";
+      ctx.fillText("Links / rechts tippen", Ws / 2, Hs * 0.42);
+    }
+  }
+  var last = 0;
+  function frame(tm) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (tm - last) / 1000); last = tm;
+    if (state === "run") { var n = Math.ceil(dt / 0.004); for (var i = 0; i < n && state === "run"; i++) step(dt / n); }
+    else if (state === "crash") crashT += dt;
+    draw();
+  }
+  function move(dir) {
+    var target = Math.max(0, Math.min(2, lane + dir));
+    if (target === lane) return;
+    // mitten im Wechsel: von aktueller Position aus weiter
+    var p = Math.min(1, lt / LANE_T);
+    from = p < 1 ? (p < 0.5 ? from : lane) : lane;
+    lane = target; lt = 0;
+  }
+  var down = null;
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) {
+    if (ui(e)) return; e.preventDefault();
+    var first = state === "idle";
+    if (first) state = "run";
+    if (state !== "run") return;
+    down = { id: e.pointerId, x: e.clientX, done: first };
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (!down || down.id !== e.pointerId || down.done) return;
+    var dx = e.clientX - down.x;
+    if (Math.abs(dx) > 28) { down.done = true; move(dx > 0 ? 1 : -1); }
+  });
+  document.addEventListener("pointerup", function (e) {
+    if (!down || down.id !== e.pointerId) return;
+    if (!down.done && state === "run") move(e.clientX < Ws / 2 ? -1 : 1);
+    down = null;
+  });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+  reset();
+  requestAnimationFrame(function (tm) { last = tm; frame(tm); });
+  window.__lr = { get s() { return { state: state, dist: dist, v: v, lane: lane, obs: obs }; }, move: move, start: function () { state = "run"; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
