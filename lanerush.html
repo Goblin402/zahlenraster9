@@ -51,15 +51,22 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </div>
 <script>
 (function () {
-  var V0 = 13.5, ACC = 1.0, VMAX = 48, LANE_T = 0.28, LANE_W = 3, ZP = 7, ZMAX = 25;
+  // Aus der Aufnahme gemessen (Meterzähler): Strecke d(t) = 13,0 t + 0,475 t², also Start 13,0 m/s, +0,95 m/s pro Sekunde.
+  // Gegenverkehr: vom Auftauchen bis zum Spieler ~0,55 s (bei 17 m/s) bis ~0,40 s (bei 32 m/s).
+  // Abstand zwischen den Reihen (Ankunft am Spieler): ~1,5 s am Anfang, ~0,7 s bei 450 m; erste Reihe bei ~65 m.
+  // Zweierreihen erst ab ~280 m, etwa jede vierte Reihe. Spurwechsel 0,22 s.
+  var V0 = 13.0, ACC = 0.95, VMAX = 60, LANE_T = 0.22, LANE_W = 3, ZP = 7, ZMAX = 25;
+  var FIRST_M = 65, PAIR_FROM = 280, PAIR_P = 0.25;
+  function approach(v) { return 0.85 * (v + 20.8); } // Tiefeneinheiten pro Sekunde
+  function rowGap(v) { return Math.max(0.5, 2.55 - 0.057 * v) * (0.88 + Math.random() * 0.24); } // Sekunden
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
   var Ws, Hs, dpr, f, yv, cx, yHor;
   function layout() {
     dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight;
     cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr);
     // Straße: am Spieler ~1,1 Bildbreiten breit, Spieler-Unterkante bei 86 % Höhe, hinterer Rand bei 66 %
-    f = 1.1 * Ws * ZP / (3 * LANE_W); cx = Ws / 2; yHor = Hs * 0.66;
-    var k = (Hs * 0.86 - yHor) / (1 / ZP - 1 / ZMAX); CAMH = k / f; yv = yHor - k / ZMAX;
+    f = 0.325 * Ws * ZP / LANE_W; /* Spurabstand am Spieler: 190 von 585 px */ cx = Ws / 2; yHor = Hs * 0.66;
+    var k = (Hs * 0.89 - yHor) / (1 / ZP - 1 / ZMAX); CAMH = k / f; yv = yHor - k / ZMAX;
   }
   var CAMH = 4;
   window.addEventListener("resize", layout); layout();
@@ -74,27 +81,30 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function laneX(l) { return (l - 1) * LANE_W; }
   function playerX() { var p = Math.min(1, lt / LANE_T); p = p * p * (3 - 2 * p); return laneX(from) + (laneX(lane) - laneX(from)) * p; }
 
+  var spawnIn = 0, lastGap = 9;
   function spawnRow(z) {
-    var two = Math.random() < Math.min(0.45, 0.18 + dist / 2500), blocked;
-    var gapT = (z - (obs.length ? obs[obs.length - 1].z : 0)) / v;
+    var two = dist >= PAIR_FROM && Math.random() < PAIR_P, blocked;
+    var gapT = lastGap;
     for (var tries = 0; tries < 20; tries++) {
       if (two) { var free = Math.floor(Math.random() * 3); blocked = [0, 1, 2].filter(function (l) { return l !== free; }); }
       else blocked = [Math.floor(Math.random() * 3)];
       var freeL = [0, 1, 2].filter(function (l) { return blocked.indexOf(l) < 0; });
       // erreichbar? kurze Abstände nur, wenn eine freie Spur gleich bleibt oder benachbart ist
-      var ok = freeL.some(function (l) { return lastFree.some(function (m) { return m === l || (Math.abs(m - l) === 1 && gapT > 0.5) || (Math.abs(m - l) === 2 && gapT > 0.9); }); });
+      var ok = freeL.some(function (l) { return lastFree.some(function (m) { return m === l || (Math.abs(m - l) === 1 && gapT > 0.35) || (Math.abs(m - l) === 2 && gapT > 0.6); }); });
       if (ok) break;
     }
     blocked.forEach(function (l) {
       var van = Math.random() < 0.3;
-      obs.push({ l: l, z: z + Math.random() * 0.6, len: van ? 4.6 : 3.4, h: van ? 1.9 : 1.25, w: van ? 2.0 : 1.8, col: COLORS[Math.floor(Math.random() * COLORS.length)], van: van });
+      obs.push({ l: l, z: z, len: van ? 4.6 : 3.4, h: van ? 1.9 : 1.25, w: van ? 2.0 : 1.8, col: COLORS[Math.floor(Math.random() * COLORS.length)], van: van });
     });
     lastFree = [0, 1, 2].filter(function (l) { return blocked.indexOf(l) < 0; });
   }
   function reset() {
     gen++; state = "idle"; dist = 0; t = 0; v = V0; lane = from = 1; lt = 1; obs = []; lastFree = [0, 1, 2];
     document.getElementById("result").hidden = true;
-    nextZ = ZMAX + 4;
+    // erste Reihe so, dass sie bei ~65 m ankommt
+    var tA = (-V0 + Math.sqrt(V0 * V0 + 2 * ACC * FIRST_M)) / ACC, vA = V0 + ACC * tA;
+    spawnIn = tA - (ZMAX - ZP) / approach(vA); lastGap = 9;
   }
   function crash() {
     state = "crash"; crashT = 0;
@@ -106,10 +116,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   function step(dt) {
     t += dt; v = Math.min(VMAX, V0 + ACC * t);
-    var d = v * dt; dist += d; scroll = (scroll + d) % 6; lt += dt;
-    obs.forEach(function (o) { o.z -= d; });
-    nextZ -= d;
-    while (nextZ < ZMAX + 6) { spawnRow(nextZ); nextZ += Math.max(9, v * (0.5 + Math.random() * 0.4)); }
+    var d = v * dt; dist += d; scroll = (scroll + d * 0.85) % 6; lt += dt;
+    var u = approach(v) * dt;
+    obs.forEach(function (o) { o.z -= u; });
+    spawnIn -= dt;
+    if (spawnIn <= 0) { spawnRow(ZMAX + 0.5); var g = rowGap(v); lastGap = g; spawnIn += g; }
     var px = playerX();
     for (var i = 0; i < obs.length; i++) {
       var o = obs[i];
