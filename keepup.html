@@ -106,7 +106,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       ball.vx = CARRY * ball.vx + off * SIDE * Ws / period(score);
       ball.vy = -v0;
       // nur beim ersten Treffer: kleiner Zufalls-Drall, damit der Ball nicht endlos senkrecht springt
-      if (score === 1) ball.vx += (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.08) * Ws;
+      if (score === 1) ball.vx += (Math.random() < 0.5 ? -1 : 1) * (0.002 + Math.random() * 0.001) * Ws;
       ball.y = padY - Math.sqrt(Math.max(0, (R + r) * (R + r) - dx * dx)) - 0.5;
       if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
     }
