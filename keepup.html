@@ -52,7 +52,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </div>
 <script>
 (function () {
-  var PAD_D = 0.25, PAD_Y = 0.92, BALL_D = 0.043, HOP = 0.55, START_Y = 0.15, CARRY = 0.3, SIDE = 3.6;
+  var PAD_D = 0.25, PAD_Y = 0.92, BALL_D = 0.043, START_Y = 0.36, CARRY = 0.3, SIDE = 3.6;
+  // Decke: weiße Linie bei 331/1266 der Höhe, der Ball prallt dort ab. HOP_K = wie weit der Wurf über die Decke hinaus ginge.
+  var CEIL = 331 / 1266, HOP_K = 1.15;
   // Zeit von Treffer zu Treffer (s) je nach Punktestand
   function period(s) {
     if (s <= 3) return 1.9;
@@ -73,7 +75,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   var bestEl = document.getElementById("best");
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
-  function setSpeed() { var T = period(score), h = HOP * Hs; g = 8 * h / (T * T); v0 = 4 * h / T; }
+  function setSpeed() {
+    // Zeit Pad -> Decke -> Pad soll period(score) ergeben
+    var T = period(score), D = (padY - R - r) - (CEIL * Hs + r), q = Math.sqrt(HOP_K) - Math.sqrt(HOP_K - 1);
+    g = 8 * D * q * q / (T * T); v0 = Math.sqrt(2 * g * HOP_K * D);
+  }
   function reset() {
     gen++; state = "idle"; score = 0; padX = Ws / 2; trail = [];
     ball = { x: Ws / 2, y: Hs * START_Y, vx: 0, vy: 0 };
@@ -92,6 +98,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ball.vy += g * dt; ball.x += ball.vx * dt; ball.y += ball.vy * dt;
     if (ball.x < r) { ball.x = r; ball.vx = Math.abs(ball.vx); }
     if (ball.x > Ws - r) { ball.x = Ws - r; ball.vx = -Math.abs(ball.vx); }
+    if (ball.y - r < CEIL * Hs && ball.vy < 0) { ball.y = CEIL * Hs + r; ball.vy = -ball.vy; }
     var dx = ball.x - padX, dy = ball.y - padY;
     if (ball.vy > 0 && dy < 0 && Math.hypot(dx, dy) < R + r) {
       score++; setSpeed();
@@ -111,7 +118,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = state === "idle" ? "rgba(255,255,255,0.45)" : "#fff";
     ctx.font = "800 " + Math.round(Ws * 0.11) + "px " + font;
-    ctx.fillText(String(score), Ws / 2, Hs * 0.13);
+    ctx.fillText(String(score), Ws / 2, Hs * 0.30);
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(0, CEIL * Hs - 1, Ws, 2);
     // Spur
     for (var i = 0; i < trail.length; i++) {
       var p = trail[i], a = (i + 1) / trail.length;
