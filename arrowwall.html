@@ -1,0 +1,210 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Arrow Wall</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Arrow Wall: Pfeil fährt rechts auf und ab, Tippen schießt ihn in die Wand. Trifft er einen steckenden Pfeil = vorbei.
+   Gemessen (390 x 844): Wand 0–84 px breit, 323–740 px hoch; Pfeilbahn 345–717 px, Bewegung wie Kosinus,
+   halbe Schwingung ~1,6–1,9 s am Anfang, etwas schneller mit jedem Treffer; Flug zur Wand ~0,1 s. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body { background: #19181d; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(10, 4, 22, 0.6); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(8, 4, 16, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  var WALL_W = 84 / 390, WALL_T = 323 / 844, WALL_B = 740 / 844, Y_T = 345 / 844, Y_B = 717 / 844;
+  var ARROW_L = 0.3, TAIL_X = 0.975, EMBED = 12 / 390, FLY_V = 4.9, TOL = 13 / 844;
+  function halfPeriod(s) { return Math.max(0.75, 1.75 - 0.035 * s) * (0.88 + Math.random() * 0.24); }
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
+  function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
+  window.addEventListener("resize", layout); layout();
+
+  var state = "idle", score = 0, best = 0, gen = 0, stuck = [], fly = null, phase = Math.PI / 2, dir = 1, hp = 1.75, fall = null, failT = 0;
+  try { best = parseInt(localStorage.getItem("arrowwall-best"), 10) || 0; } catch (e) {}
+  var bestEl = document.getElementById("best");
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  // Position des Werfers (0 = oben, 1 = unten) als Kosinus-Schwingung
+  function curY() { return Y_T + (Y_B - Y_T) * (0.5 - 0.5 * Math.cos(phase)); }
+  function reset() {
+    gen++; state = "idle"; score = 0; stuck = []; fly = null; fall = null; phase = Math.PI * 0.5; hp = halfPeriod(0);
+    document.getElementById("result").hidden = true;
+  }
+  function over() {
+    state = "over"; failT = 0;
+    var rec = score > best;
+    if (rec) { best = score; try { localStorage.setItem("arrowwall-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = score + " Pts";
+    var g = gen; setTimeout(function () { if (g === gen) document.getElementById("result").hidden = false; }, 1000);
+  }
+  function step(dt) {
+    if (state === "run") {
+      var old = phase;
+      phase += Math.PI / hp * dt;
+      // an jedem Umkehrpunkt neues Tempo
+      if (Math.floor(old / Math.PI) !== Math.floor(phase / Math.PI)) hp = halfPeriod(score);
+    }
+    if (fly) {
+      fly.x -= FLY_V * dt; // Spitze, in Bildbreiten
+      var tipStop = WALL_W - EMBED;
+      // Treffer auf einen steckenden Pfeil (dessen Ende reicht bis WALL_W - EMBED + ARROW_L)
+      for (var i = 0; i < stuck.length; i++) {
+        if (Math.abs(stuck[i] - fly.y) < TOL && fly.x <= tipStop + ARROW_L) {
+          fall = { x: fly.x, y: fly.y, vx: 0.8, vy: -0.2, rot: 0 }; fly = null; over(); return;
+        }
+      }
+      if (fly.x <= tipStop) { stuck.push(fly.y); fly = null; score++; }
+    }
+    if (fall) { fall.vy += 2.2 * dt; fall.x += fall.vx * dt * 0.4; fall.y += fall.vy * dt; fall.rot += 6 * dt; failT += dt; }
+  }
+  function arrow(tipX, y, rot, alpha) {
+    var L = ARROW_L * Ws, th = Math.max(2, Ws * 0.009), fl = Ws * 0.045;
+    ctx.save(); ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.translate(tipX, y); if (rot) ctx.rotate(rot);
+    ctx.fillStyle = "#f2efe8"; ctx.fillRect(0, -th / 2, L - fl * 0.4, th);
+    // Spitze
+    ctx.beginPath(); ctx.moveTo(-th * 1.6, 0); ctx.lineTo(th * 2.2, -th * 1.6); ctx.lineTo(th * 2.2, th * 1.6); ctx.closePath(); ctx.fill();
+    // Federn (zwei Winkel)
+    ctx.strokeStyle = "#e8344a"; ctx.lineWidth = Math.max(2, Ws * 0.008); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    [0, 0.42].forEach(function (k) {
+      var x0 = L - fl + k * fl;
+      ctx.beginPath(); ctx.moveTo(x0 + fl * 0.45, -fl * 0.36); ctx.lineTo(x0, 0); ctx.lineTo(x0 + fl * 0.45, fl * 0.36); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#19181d"; ctx.fillRect(0, 0, Ws, Hs);
+    var font = getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = state === "idle" ? "rgba(255,255,255,0.45)" : "#fff";
+    ctx.font = "800 " + Math.round(Ws * 0.12) + "px " + font; ctx.fillText(String(score), Ws / 2, Hs * 0.315);
+    // Wand
+    var wx = WALL_W * Ws, wt = WALL_T * Hs, wb = WALL_B * Hs;
+    // steckende Pfeile (Spitze steckt in der Wand, daher vor der Wand gezeichnet)
+    stuck.forEach(function (yy) { arrow(wx - EMBED * Ws, yy * Hs); });
+    ctx.fillStyle = "#ece8df"; ctx.fillRect(0, wt, wx, wb - wt);
+    ctx.fillStyle = "rgba(0,0,0,0.13)";
+    for (var y = wt + (wb - wt) / 8; y < wb - 2; y += (wb - wt) / 8) ctx.fillRect(0, y, wx * 0.88, 2);
+    stuck.forEach(function (yy) { ctx.fillStyle = "#2a2730"; ctx.fillRect(wx - EMBED * Ws, yy * Hs - Math.max(2, Ws * 0.008), EMBED * Ws, Math.max(4, Ws * 0.016)); });
+    // Bahn des Werfers
+    ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fillRect(TAIL_X * Ws + 1, Y_T * Hs, 2, (Y_B - Y_T) * Hs);
+    if (fly) arrow(fly.x * Ws, fly.y * Hs);
+    if (fall) arrow(fall.x * Ws, fall.y * Hs, fall.rot);
+    // Pfeil am Werfer (mit Zielpunkten)
+    if (state !== "over" && !fly) {
+      var cy = curY() * Hs, tip = (TAIL_X - ARROW_L) * Ws;
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      for (var x = tip - Ws * 0.03; x > wx + ARROW_L * Ws * 0.35; x -= Ws * 0.03) { ctx.beginPath(); ctx.arc(x, cy, 1.3, 0, 7); ctx.fill(); }
+      arrow(tip, cy);
+    }
+    if (state === "over") { var a = Math.max(0, 0.35 * (1 - failT / 0.4)); if (a > 0) { ctx.fillStyle = "rgba(220,50,60," + a + ")"; ctx.fillRect(0, 0, Ws, Hs); } }
+    if (state === "idle") { ctx.fillStyle = "#fff"; ctx.font = "800 " + Math.round(Math.min(Ws * 0.06, 26)) + "px " + font; ctx.fillText("Tippen zum Schießen", Ws / 2, Hs * 0.6); }
+  }
+  var last = 0;
+  function frame(t) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    var n = Math.ceil(dt / 0.004); for (var i = 0; i < n; i++) step(dt / n);
+    draw();
+  }
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) {
+    if (ui(e)) return; e.preventDefault();
+    if (state === "over") return;
+    if (state === "idle") state = "run";
+    if (fly) return;
+    fly = { x: TAIL_X - ARROW_L, y: curY() };
+  });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+  reset();
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+  window.__aw = { get s() { return { state: state, score: score, y: curY(), stuck: stuck, fly: !!fly }; }, shoot: function () { if (state === "idle") state = "run"; if (!fly) fly = { x: TAIL_X - ARROW_L, y: curY() }; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
