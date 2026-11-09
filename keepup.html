@@ -71,7 +71,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   window.addEventListener("resize", layout); layout();
 
   var state = "idle", score = 0, best = 0, gen = 0, ball, padX, g, v0, trail = [];
-  try { best = parseInt(localStorage.getItem("keepup-best"), 10) || 0; } catch (e) {}
+  try { localStorage.removeItem("keepup-best"); best = parseInt(localStorage.getItem("keepup-best-v2"), 10) || 0; } catch (e) {}
   var bestEl = document.getElementById("best");
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
@@ -89,7 +89,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function over() {
     state = "over";
     var rec = score > best;
-    if (rec) { best = score; try { localStorage.setItem("keepup-best", String(best)); } catch (e) {} showBest(); }
+    if (rec) { best = score; try { localStorage.setItem("keepup-best-v2", String(best)); } catch (e) {} showBest(); }
     document.getElementById("rec").hidden = !rec;
     document.getElementById("pts").textContent = score + " Pts";
     var gg = gen; setTimeout(function () { if (gg === gen) document.getElementById("result").hidden = false; }, 500);
