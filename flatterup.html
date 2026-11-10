@@ -1,0 +1,246 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Flatter Up</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Flatter Up: links/rechts tippen = schräg nach oben flattern. Schlucht wird enger, Wind drückt zur Seite, Wand = vorbei.
+   Gemessen (390 x 844): 1 m = 21,4 px; Steigen ~7,4 m/s bei ~2,2 Tipps/s; Vogel bleibt bei ~65 % Höhe;
+   Schluchtbreite 0,68 Bildbreiten bei 11 m, 0,34 bei 150 m; seitlich ~0,25 Bildbreiten/s pro Flattern. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body { background: #1b1620; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(10, 4, 22, 0.6); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(8, 4, 16, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  // Welt in Metern (y nach oben). Bildschirm: 1 m = PXM * Höhe.
+  var PXM = 21.4 / 844, BIRD_Y = 0.65, FLAP_UP = 11, GRAV = 16, FLAP_SIDE = 0.25, BIRD_R = 0.034;
+  var SEG = 3.2;                 // Länge eines Wandstücks in m
+  function width(m) { return Math.max(0.27, 0.70 - 0.0024 * m); } // in Bildbreiten
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
+  function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
+  window.addEventListener("resize", layout); layout();
+
+  var state = "idle", best = 0, gen = 0, bird, cam, pts, wind, windT, windTarget, puffs, crashT = 0, top = 0;
+  try { best = parseFloat(localStorage.getItem("flatterup-best")) || 0; } catch (e) {}
+  var bestEl = document.getElementById("best");
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best.toFixed(1) : "--"); }
+  showBest();
+  // Schlucht: Mittellinie als Punkte alle SEG Meter, x in Bildbreiten (0..1)
+  function extend(upTo) {
+    while (pts[pts.length - 1].y < upTo) {
+      var p = pts[pts.length - 1], y = p.y + SEG * (0.7 + Math.random() * 0.6);
+      var w = width(y), lim = w / 2 + 0.05, x = p.x + (Math.random() - 0.5) * 0.22;
+      x = Math.max(lim, Math.min(1 - lim, x));
+      pts.push({ y: y, x: x, jl: (Math.random() - 0.5) * 0.04, jr: (Math.random() - 0.5) * 0.04 });
+    }
+  }
+  function canyonAt(y) {
+    for (var i = 1; i < pts.length; i++) {
+      if (pts[i].y >= y) {
+        var a = pts[i - 1], b = pts[i], k = (y - a.y) / (b.y - a.y), w = width(y);
+        var cx = a.x + (b.x - a.x) * k, jl = a.jl + (b.jl - a.jl) * k, jr = a.jr + (b.jr - a.jr) * k;
+        return [cx - w / 2 + jl, cx + w / 2 + jr];
+      }
+    }
+    return [0, 1];
+  }
+  function reset() {
+    gen++; state = "idle"; crashT = 0; top = 0;
+    bird = { x: 0.5, y: 0, vx: 0, vy: 0, face: 1, flap: 0 };
+    cam = 0; wind = 0; windT = 0; windTarget = 0; puffs = [];
+    pts = [{ y: -30, x: 0.5, jl: 0, jr: 0 }, { y: 0, x: 0.5, jl: 0, jr: 0 }, { y: 6, x: 0.5, jl: 0, jr: 0 }];
+    extend(60);
+    document.getElementById("result").hidden = true;
+  }
+  function crash() {
+    state = "crash"; crashT = 0;
+    var sc = Math.round(top * 10) / 10, rec = sc > best;
+    if (rec) { best = sc; try { localStorage.setItem("flatterup-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = sc.toFixed(1).replace(".", ",") + " Pts";
+    var g = gen; setTimeout(function () { if (g === gen) { state = "done"; document.getElementById("result").hidden = false; } }, 900);
+  }
+  function step(dt) {
+    // Wind: langsam wechselnde Böen, stärker je höher
+    windT -= dt;
+    if (windT <= 0) { windT = 1.2 + Math.random() * 1.8; var s = Math.min(0.32, 0.08 + top * 0.0015); windTarget = (Math.random() - 0.5) * 2 * s; }
+    wind += (windTarget - wind) * Math.min(1, dt * 1.5);
+    bird.vy -= GRAV * dt; bird.y += bird.vy * dt;
+    bird.vx += wind * dt; bird.x += bird.vx * dt;
+    bird.flap = Math.max(0, bird.flap - dt);
+    if (bird.y > top) top = bird.y;
+    // Kamera folgt nur nach oben
+    var camT = bird.y; if (camT > cam) cam = camT;
+    extend(cam + 60);
+    var c = canyonAt(bird.y), rx = BIRD_R * Ws / Ws;
+    if (bird.x - BIRD_R < c[0] || bird.x + BIRD_R > c[1]) { crash(); return; }
+    // unten aus dem Bild gefallen
+    var sy = Hs * BIRD_Y + (cam - bird.y) * PXM * Hs;
+    if (sy > Hs + 30) { crash(); return; }
+  }
+  function flap(dir) {
+    bird.vy = FLAP_UP; bird.vx = dir * FLAP_SIDE; bird.face = dir; bird.flap = 0.18;
+    for (var i = 0; i < 3; i++) puffs.push({ x: bird.x - dir * 0.02, y: bird.y - 0.3, vx: -dir * (0.05 + Math.random() * 0.08), vy: -1 - Math.random() * 2, life: 0.5 });
+  }
+  function sy(y) { return Hs * BIRD_Y + (cam - y) * PXM * Hs; }
+  function draw(dt) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#231c2b"; ctx.fillRect(0, 0, Ws, Hs);
+    // sichtbarer Bereich in m
+    var yTop = cam + (Hs * BIRD_Y) / (PXM * Hs) + 2, yBot = cam - (Hs * (1 - BIRD_Y)) / (PXM * Hs) - 2;
+    // Boden der Schlucht + Wände
+    var left = [], right = [];
+    for (var y = yBot; y <= yTop; y += 0.5) { var c = canyonAt(y); left.push([c[0] * Ws, sy(y)]); right.push([c[1] * Ws, sy(y)]); }
+    ctx.fillStyle = "#3a5a52"; ctx.beginPath();
+    left.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+    for (var i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
+    ctx.closePath(); ctx.fill();
+    // Wandkanten (Fels)
+    [left, right].forEach(function (side, si) {
+      var off = si ? 1 : -1;
+      ctx.fillStyle = "#8c6a4a"; ctx.beginPath();
+      side.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+      for (var j = side.length - 1; j >= 0; j--) ctx.lineTo(side[j][0] + off * Ws * 0.045, side[j][1]);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#c79b6a"; ctx.lineWidth = 2.5; ctx.beginPath();
+      side.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.stroke();
+    });
+    // Windteilchen
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    var tm = performance.now() / 1000;
+    for (var k = 0; k < 14; k++) {
+      var px = ((k * 0.137 + tm * wind * 1.6 + 10) % 1) * Ws, py = ((k * 0.291 + (cam * PXM) * 0.6) % 1) * Hs;
+      ctx.fillRect(px, py, Math.max(2, Math.abs(wind) * 30), 1.5);
+    }
+    // Federwölkchen
+    puffs.forEach(function (p) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; ctx.fillStyle = "rgba(255,255,255," + Math.max(0, p.life * 1.4) + ")"; ctx.beginPath(); ctx.arc(p.x * Ws, sy(p.y), 3, 0, 7); ctx.fill(); });
+    puffs = puffs.filter(function (p) { return p.life > 0; });
+    // Vogel (eigene Figur: runder blauer Vogel)
+    var bx = bird.x * Ws, by = sy(bird.y), r = BIRD_R * Ws;
+    ctx.save(); ctx.translate(bx, by); ctx.scale(bird.face, 1); ctx.rotate(state === "crash" || state === "done" ? crashT * 8 : -0.15);
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(0, r * 1.25, r * 0.8, r * 0.25, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#4aa8ff"; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    ctx.fillStyle = "#d8eeff"; ctx.beginPath(); ctx.arc(r * 0.15, r * 0.3, r * 0.55, 0, 7); ctx.fill();
+    ctx.fillStyle = "#2a78c8"; ctx.beginPath(); var wy = bird.flap > 0 ? -r * 0.7 : r * 0.1;
+    ctx.ellipse(-r * 0.35, wy * 0.5, r * 0.55, r * 0.3, bird.flap > 0 ? -0.8 : 0.3, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ffb52e"; ctx.beginPath(); ctx.moveTo(r * 0.85, -r * 0.15); ctx.lineTo(r * 1.4, r * 0.02); ctx.lineTo(r * 0.85, r * 0.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(r * 0.45, -r * 0.3, r * 0.25, 0, 7); ctx.fill();
+    ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(r * 0.52, -r * 0.3, r * 0.12, 0, 7); ctx.fill();
+    ctx.restore();
+    // Meter
+    var font = getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "800 " + Math.round(Ws * 0.15) + "px " + font;
+    var txt = Math.floor(top) + " m";
+    ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillText(txt, Ws / 2, Hs * 0.32 + 4);
+    ctx.fillStyle = state === "idle" ? "rgba(255,248,236,0.5)" : "#fff6e6"; ctx.fillText(txt, Ws / 2, Hs * 0.32);
+    if (state === "idle") { ctx.font = "800 " + Math.round(Math.min(Ws * 0.06, 26)) + "px " + font; ctx.fillStyle = "#fff"; ctx.fillText("Links oder rechts tippen", Ws / 2, Hs * 0.47); }
+    if (state === "crash" || state === "done") { var a = Math.max(0, 0.4 * (1 - crashT / 0.4)); if (a > 0) { ctx.fillStyle = "rgba(220,50,60," + a + ")"; ctx.fillRect(0, 0, Ws, Hs); } }
+  }
+  var last = 0;
+  function frame(t) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (state === "run") { var n = Math.ceil(dt / 0.004); for (var i = 0; i < n && state === "run"; i++) step(dt / n); }
+    else if (state === "crash" || state === "done") { crashT += dt; bird.vy -= GRAV * dt; bird.y += bird.vy * dt * 0.5; }
+    draw(dt);
+  }
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) {
+    if (ui(e)) return; e.preventDefault();
+    if (state === "crash" || state === "done") return;
+    if (state === "idle") state = "run";
+    flap(e.clientX < Ws / 2 ? -1 : 1);
+  });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+  reset();
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+  window.__cu = { get s() { return { state: state, top: top, bird: bird, c: canyonAt(bird.y), wind: wind }; }, flap: function (d) { if (state === "idle") state = "run"; flap(d); } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
