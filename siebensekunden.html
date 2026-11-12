@@ -38,8 +38,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
 .result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
 .result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.fast { position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); z-index: 6;
+  display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 4px; margin: -4px; color: #f3f2d4; font: inherit; font-size: 14px; cursor: pointer; }
+.fast i { width: 24px; height: 24px; border: 2px solid #f3f2d4; border-radius: 7px; opacity: 0.55; box-sizing: border-box; }
+.fast span { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.fast[aria-pressed="true"] i { background: #ffd850; border-color: #ffd850; opacity: 1; }
+.fast[aria-pressed="true"] span { opacity: 1; }
+.fast:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 8px; }
 </style>
 <canvas id="cv"></canvas>
+<button class="fast" id="fast" type="button" aria-pressed="false" aria-label="Timer startet bei 5 Sekunden"><i></i><span>5</span></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -57,17 +65,23 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
   window.addEventListener("resize", layout); layout();
   var state = "idle", t0 = 0, stopT = 0, best = 0, gen = 0;
-  try { best = parseFloat(localStorage.getItem("siebensek-best")); if (!(best >= 0)) best = 0; } catch (e) {}
+  // Übungsmodus "5": Timer startet schon bei 5,00 s, eigener Highscore
+  var from5 = false, fastBtn = document.getElementById("fast");
+  try { from5 = localStorage.getItem("siebensek-5") === "1"; } catch (e) {}
+  function key() { return from5 ? "siebensek-best-5" : "siebensek-best"; }
+  function startAt() { return from5 ? 5 : 0; }
+  function loadBest() { try { best = parseFloat(localStorage.getItem(key())); if (!(best >= 0)) best = 0; } catch (e) { best = 0; } }
+  loadBest();
   var bestEl = document.getElementById("best");
-  function hasBest() { try { return localStorage.getItem("siebensek-best") !== null; } catch (e) { return false; } }
+  function hasBest() { try { return localStorage.getItem(key()) !== null; } catch (e) { return false; } }
   function showBest2() { bestEl.innerHTML = "<b>Best</b>" + (hasBest() ? best.toFixed(2) + "s" : "--"); }
   showBest2();
-  function elapsed() { return state === "run" ? (performance.now() - t0) / 1000 : stopT; }
+  function elapsed() { return state === "run" ? (performance.now() - t0) / 1000 : state === "idle" ? startAt() : stopT; }
   function finish(late) {
     var g = gen, sc = late ? null : Math.abs(stopT - TARGET);
     var shown = late ? "Zu spät" : (Math.round(sc * 100) / 100).toFixed(2) + "s";
     var rec = !late && (!hasBest() || sc < best);
-    if (rec) { best = Math.round(sc * 100) / 100; try { localStorage.setItem("siebensek-best", String(best)); } catch (e) {} showBest2(); }
+    if (rec) { best = Math.round(sc * 100) / 100; try { localStorage.setItem(key(), String(best)); } catch (e) {} showBest2(); }
     document.getElementById("rec").hidden = !rec;
     document.getElementById("pts").textContent = shown;
     setTimeout(function () { if (g === gen) document.getElementById("result").hidden = false; }, 1600);
@@ -117,14 +131,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
   }
   function frame() { requestAnimationFrame(frame); draw(); }
-  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx") || e.target.closest(".fast")); }
   document.addEventListener("pointerdown", function (e) {
     if (ui(e)) return; e.preventDefault();
-    if (state === "idle") { state = "run"; t0 = performance.now(); return; }
+    if (state === "idle") { state = "run"; t0 = performance.now() - startAt() * 1000; return; }
     if (state === "run") { stopT = (performance.now() - t0) / 1000; state = "stop"; finish(false); }
   });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
   bindTap(document.getElementById("reset"), reset);
+  function setFast(v) { from5 = v; fastBtn.setAttribute("aria-pressed", v ? "true" : "false"); try { localStorage.setItem("siebensek-5", v ? "1" : "0"); } catch (e) {} loadBest(); showBest2(); reset(); }
+  setFast(from5);
+  bindTap(fastBtn, function () { if (state === "run") return; setFast(!from5); });
   bindTap(document.getElementById("ok"), reset);
   reset(); requestAnimationFrame(frame);
   window.__ot = { get s() { return { state: state, t: elapsed() }; } };
