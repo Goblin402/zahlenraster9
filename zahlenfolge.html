@@ -116,8 +116,9 @@ body { background: #1c1d26; color: #fff; font-family: var(--font); font-weight: 
     renderSeq(); layoutGrid();
   }
   function start() {
-    state = "run"; $("intro").hidden = true; $("time").className = "time"; t0 = performance.now(); extra = 0;
-    renderSeq(); tick();
+    // Zeit läuft erst ab dem ersten richtigen Tipp
+    state = "ready"; $("intro").hidden = true; $("time").className = "time"; extra = 0;
+    renderSeq();
   }
   function finish() {
     state = "done"; cancelAnimationFrame(raf);
@@ -129,9 +130,10 @@ body { background: #1c1d26; color: #fff; font-family: var(--font); font-weight: 
     var g = gen; setTimeout(function () { if (g === gen) $("result").hidden = false; }, 500);
   }
   $("grid").addEventListener("pointerdown", function (e) {
-    var b = e.target.closest(".tile"); if (!b || state !== "run") return;
+    var b = e.target.closest(".tile"); if (!b || (state !== "run" && state !== "ready")) return;
     e.preventDefault();
     var d = +b.getAttribute("data-d");
+    if (state === "ready" && d === seq[pos]) { state = "run"; t0 = performance.now(); tick(); }
     if (d === seq[pos]) {
       pos++; renderSeq();
       if (pos >= LEN) finish(); else layoutGrid();
