@@ -85,8 +85,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (k > 0) { ctx.strokeStyle = "#27f2be"; ctx.beginPath(); ctx.arc(cx, cy, rm, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke(); }
     var font = getComputedStyle(document.body).fontFamily;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = "800 " + Math.round(Ws * 0.2) + "px " + font; ctx.fillStyle = "#fff";
-    ctx.fillText(t.toFixed(2), cx, cy + Ws * 0.005);
+    // Zahl mit festen Zeichenbreiten (jede Ziffer in gleich breiter Zelle), damit nichts wackelt;
+    // Gesamtbreite ist fest (49 % der Bildbreite wie im Original) und mittig, passt sicher in den Ring.
+    drawNumber(t.toFixed(2), cx, cy, Ws * 0.49, font);
     ctx.font = "800 " + Math.round(Ws * 0.05) + "px " + font;
     var hint = state === "stop" ? "UM " + Math.abs(stopT - TARGET).toFixed(4) + "s DANEBEN" : state === "late" ? "ZU SPÄT" : "BEI 7 TIPPEN";
     if (state !== "idle") ctx.fillText(hint, cx, Hs * HINT_Y);
@@ -96,6 +97,23 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       ctx.fillText("Tippe zum Start,", cx, cy + Ws * 0.07); ctx.fillText("dann bei 7s", cx, cy + Ws * 0.137);
       var pu = 0.5 + 0.5 * Math.sin(performance.now() / 1000 * 4);
       ctx.fillStyle = "rgba(255,255,255," + (0.3 + 0.6 * pu) + ")"; ctx.beginPath(); ctx.arc(cx, Hs * 0.818, Ws * 0.06, 0, 7); ctx.fill();
+    }
+  }
+  function drawNumber(txt, cx, cy, targetW, font) {
+    var fs = 100, i, dw = 0, pw;
+    ctx.font = "800 " + fs + "px " + font;
+    for (i = 0; i <= 9; i++) dw = Math.max(dw, ctx.measureText(String(i)).width);
+    pw = ctx.measureText(".").width;
+    // Breite für "0.00": 3 Ziffern + Punkt; Schrift so skalieren, dass das genau targetW ergibt
+    var k = targetW / (3 * dw + pw * 1.15);
+    fs *= k; dw *= k; pw *= k * 1.15;
+    ctx.font = "800 " + fs.toFixed(1) + "px " + font; ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    var digitsBefore = txt.indexOf("."), total = digitsBefore * dw + pw + (txt.length - digitsBefore - 1) * dw;
+    // linke Kante fest: Block für "0.00" mittig, längere Zahlen (10.00) wachsen nach links
+    var x = cx - (3 * dw + pw) / 2 - (digitsBefore - 1) * dw;
+    for (i = 0; i < txt.length; i++) {
+      var ch = txt[i], w = ch === "." ? pw : dw;
+      ctx.fillText(ch, x + w / 2, cy + fs * 0.04); x += w;
     }
   }
   function frame() { requestAnimationFrame(frame); draw(); }
