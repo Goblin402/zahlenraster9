@@ -1,0 +1,206 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Target Tap</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Target Tap: Zielscheiben antippen, bevor der grüne Ring abläuft. 3 Leben, jedes verpasste Ziel kostet eins.
+   Gemessen (390 x 844): Ziel ~44 px Durchmesser, Mitten x 52–335, y 325–757; Treffer pro Sekunde ~2 am Anfang,
+   ~3 nach 13 s, ~4 nach 25 s, ~5 nach 40 s (bei 172 Punkten in ~48 s). */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body { background: #1c2331; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(10, 4, 22, 0.6); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(8, 4, 16, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  var DIAM = 44 / 390, X0 = 52 / 390, X1 = 335 / 390, Y0 = 325 / 844, Y1 = 757 / 844, LIVES = 3, HIT_PAD = 1.2;
+  function rate(t) { return 2.2 + 0.06 * t; }               // neue Ziele pro Sekunde
+  function life(t) { return Math.max(0.85, 2.0 - 0.025 * t); } // Sekunden bis das Ziel verschwindet
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
+  function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
+  window.addEventListener("resize", layout); layout();
+
+  var state = "idle", score = 0, lives = LIVES, best = 0, gen = 0, t = 0, spawnAcc = 0, targets = [], fx = [], hurt = 0;
+  try { best = parseInt(localStorage.getItem("targettap-best"), 10) || 0; } catch (e) {}
+  var bestEl = document.getElementById("best");
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function spawn() {
+    var r = DIAM * Ws / 2, x, y, ok, tries = 0;
+    do {
+      x = (X0 + Math.random() * (X1 - X0)) * Ws; y = (Y0 + Math.random() * (Y1 - Y0)) * Hs; ok = true;
+      for (var i = 0; i < targets.length; i++) if (Math.hypot(targets[i].x - x, targets[i].y - y) < r * 2.4) { ok = false; break; }
+    } while (!ok && ++tries < 30);
+    targets.push({ x: x, y: y, age: 0, life: life(t) });
+  }
+  function reset() {
+    gen++; state = "idle"; score = 0; lives = LIVES; t = 0; spawnAcc = 0; targets = []; fx = []; hurt = 0;
+    document.getElementById("result").hidden = true;
+  }
+  function over() {
+    state = "over";
+    var rec = score > best;
+    if (rec) { best = score; try { localStorage.setItem("targettap-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = score + " Pts";
+    var g = gen; setTimeout(function () { if (g === gen) document.getElementById("result").hidden = false; }, 700);
+  }
+  function update(dt) {
+    fx.forEach(function (f) { f.a += dt; }); fx = fx.filter(function (f) { return f.a < 0.3; });
+    hurt = Math.max(0, hurt - dt);
+    if (state !== "run") return;
+    t += dt; spawnAcc += rate(t) * dt;
+    while (spawnAcc >= 1) { spawnAcc -= 1; spawn(); }
+    for (var i = targets.length - 1; i >= 0; i--) {
+      var g = targets[i]; g.age += dt;
+      if (g.age >= g.life) {
+        targets.splice(i, 1); fx.push({ x: g.x, y: g.y, a: 0, miss: true }); lives--; hurt = 0.35;
+        if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+        if (lives <= 0) { over(); return; }
+      }
+    }
+  }
+  function bull(x, y, r, alpha) {
+    ctx.globalAlpha = alpha;
+    [["#e23a3a", 1], ["#fff", 0.74], ["#e23a3a", 0.5], ["#fff", 0.28], ["#e23a3a", 0.12]].forEach(function (c) {
+      ctx.fillStyle = c[0]; ctx.beginPath(); ctx.arc(x, y, r * c[1], 0, 7); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#1c2331"; ctx.fillRect(0, 0, Ws, Hs);
+    if (hurt > 0) { ctx.fillStyle = "rgba(220,50,60," + (hurt * 0.6) + ")"; ctx.fillRect(0, 0, Ws, Hs); }
+    var r = DIAM * Ws / 2;
+    targets.forEach(function (g) {
+      var pop = Math.min(1, g.age / 0.08), k = 1 - g.age / g.life;
+      bull(g.x, g.y, r * (0.6 + 0.4 * pop), 1);
+      // Restzeit-Ring
+      ctx.strokeStyle = "#35c46a"; ctx.lineWidth = Math.max(2, r * 0.13);
+      ctx.beginPath(); ctx.arc(g.x, g.y, r * 1.12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+    });
+    fx.forEach(function (f) {
+      var p = f.a / 0.3;
+      if (f.miss) bull(f.x, f.y, r * (1 - 0.5 * p), 0.5 * (1 - p));
+      else bull(f.x, f.y, r * (1 + 0.5 * p), 0.55 * (1 - p));
+    });
+    // Leben + Punkte
+    var font = getComputedStyle(document.body).fontFamily, hy = Hs * 0.29;
+    ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    for (var i = 0; i < LIVES; i++) {
+      var hx = Ws * 0.05 + i * Ws * 0.06;
+      ctx.fillStyle = i < lives ? "#ff5a6a" : "rgba(255,255,255,0.18)";
+      ctx.beginPath(); var s = Ws * 0.024;
+      ctx.moveTo(hx, hy + s * 0.9); ctx.bezierCurveTo(hx - s * 1.4, hy - s * 0.1, hx - s * 0.6, hy - s * 1.2, hx, hy - s * 0.35);
+      ctx.bezierCurveTo(hx + s * 0.6, hy - s * 1.2, hx + s * 1.4, hy - s * 0.1, hx, hy + s * 0.9); ctx.fill();
+    }
+    ctx.fillStyle = state === "idle" ? "rgba(255,255,255,0.45)" : "#fff";
+    ctx.font = "800 " + Math.round(Ws * 0.085) + "px " + font; ctx.fillText(String(score), Ws * 0.24, hy + 2);
+    if (state === "idle") {
+      ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "800 " + Math.round(Math.min(Ws * 0.06, 26)) + "px " + font;
+      ctx.fillText("Tippen zum Start", Ws / 2, Hs * 0.55);
+    }
+  }
+  var last = 0;
+  function frame(tm) { requestAnimationFrame(frame); var dt = Math.min(0.05, (tm - last) / 1000); last = tm; update(dt); draw(); }
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) {
+    if (ui(e)) return; e.preventDefault();
+    if (state === "idle") { state = "run"; spawn(); return; }
+    if (state !== "run") return;
+    var r = DIAM * Ws / 2 * HIT_PAD, bestI = -1, bd = 1e9;
+    for (var i = 0; i < targets.length; i++) { var d = Math.hypot(targets[i].x - e.clientX, targets[i].y - e.clientY); if (d < r && d < bd) { bd = d; bestI = i; } }
+    if (bestI >= 0) { var g = targets.splice(bestI, 1)[0]; fx.push({ x: g.x, y: g.y, a: 0 }); score++; }
+  });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+  reset();
+  requestAnimationFrame(function (tm) { last = tm; frame(tm); });
+  window.__ts = { get s() { return { state: state, score: score, lives: lives, t: t, targets: targets }; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
