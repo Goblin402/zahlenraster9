@@ -1,0 +1,191 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Zahlenfolge</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Zahlenfolge: oben 8 Ziffern, im 3x3-Gitter nacheinander antippen. Nach jedem Treffer wird neu gemischt,
+   manchmal liegen die Kacheln schief/verrutscht. Falscher Tipp = +0,1 s und roter Blitz. Zeit zählt, weniger ist besser.
+   Maße (390 x 844): Zeit bei 30,6 %, Ziffernreihe bei 38,7 % (Kästchen 40 px), Kacheln 82 px, Abstand 94 px, Mitten bei 60,8/71,9/83,0 %. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
+html, body { height: 100%; }
+body { background: #1c1d26; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(10, 4, 22, 0.6); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+#flash { position: absolute; inset: 0; background: #c0223a; opacity: 0; pointer-events: none; z-index: 1; transition: opacity 0.45s ease-out; }
+#flash.on { opacity: 0.35; transition: none; }
+.time { position: absolute; left: 0; right: 0; top: 30.6%; transform: translateY(-50%); text-align: center; font-size: min(16vw, 72px); font-variant-numeric: tabular-nums; z-index: 2; }
+.time.off { opacity: 0.35; }
+.seq { position: absolute; left: 0; right: 0; top: 38.7%; transform: translateY(-50%); display: flex; justify-content: center; gap: 1.8vw; z-index: 2; }
+.seq span { width: 10.3vw; max-width: 46px; aspect-ratio: 1; border-radius: 22%; background: #3a3b47; color: #b9bac4; display: flex; align-items: center; justify-content: center; font-size: min(6vw, 26px); }
+.seq span.cur { background: #ffd60a; color: #1c1d26; }
+.seq span.done { background: #1f9b7c; color: #9fe3cf; }
+.grid { position: absolute; inset: 0; z-index: 2; }
+.tile { position: absolute; width: 21vw; max-width: 96px; aspect-ratio: 1; border-radius: 14%; border: 0; color: #fff; font: inherit; font-size: min(9vw, 40px);
+  display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+.tile:active { filter: brightness(1.15); }
+.tile:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.intro { position: absolute; inset: 0; z-index: 4; background: rgba(15, 16, 22, 0.72); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.intro[hidden] { display: none; }
+.intro p { font-size: min(7vw, 28px); text-align: center; line-height: 1.15; margin: 0 0 30vh; }
+.pulse { position: absolute; left: 50%; top: 83%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #fff; animation: pu 1.1s ease-in-out infinite; }
+@keyframes pu { 0%, 100% { transform: scale(0.75); opacity: 0.55; } 50% { transform: scale(1); opacity: 1; } }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(8, 4, 16, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<div id="flash"></div>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="time off" id="time">0.0s</div>
+<div class="seq" id="seq"></div>
+<div class="grid" id="grid"></div>
+<div class="intro" id="intro"><p>Tippe die<br>Reihenfolge</p><div class="pulse"></div></div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Deine Zeit</div>
+  <div class="pts" id="pts">0.00s</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  var LEN = 8, PENALTY = 0.1;
+  var COL = { 1: "#e5245f", 2: "#2a8be8", 3: "#09afc4", 4: "#fb8c1a", 5: "#47a447", 6: "#8f2db0", 7: "#f2443a", 8: "#0d9de6", 9: "#fdb515" };
+  var COLS_X = [101 / 390, 195 / 390, 289 / 390], ROWS_Y = [0.608, 0.719, 0.830];
+  var state = "intro", seq = [], pos = 0, t0 = 0, extra = 0, best = 0, gen = 0, raf = 0;
+  try { best = parseFloat(localStorage.getItem("zahlenfolge-best")) || 0; } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  function showBest() { $("best").innerHTML = "<b>Best</b>" + (best ? best.toFixed(2) + "s" : "--"); }
+  showBest();
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function makeSeq() {
+    var s = [];
+    while (s.length < LEN) { var d = 1 + Math.floor(Math.random() * 9); if (d !== s[s.length - 1]) s.push(d); }
+    return s;
+  }
+  function renderSeq() {
+    $("seq").innerHTML = seq.map(function (d, i) { return '<span class="' + (i < pos ? "done" : i === pos && state !== "intro" ? "cur" : i === pos ? "cur" : "") + '">' + d + "</span>"; }).join("");
+  }
+  // Gitter neu mischen; manchmal (später öfter und stärker) verrutscht und schief
+  function layoutGrid() {
+    var digits = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]), messy = state === "run" && Math.random() < 0.15 + 0.06 * pos;
+    var amp = messy ? 0.05 + 0.012 * pos : 0;
+    var html = "";
+    digits.forEach(function (d, i) {
+      var x = COLS_X[i % 3], y = ROWS_Y[Math.floor(i / 3)];
+      var dx = (Math.random() - 0.5) * 2 * amp, dy = (Math.random() - 0.5) * 2 * amp * 0.6, rot = messy ? (Math.random() - 0.5) * 16 : 0;
+      html += '<button class="tile" type="button" data-d="' + d + '" style="left:' + ((x + dx) * 100) + "%;top:" + ((y + dy) * 100) + "%;background:" + COL[d] +
+        ";transform:translate(-50%,-50%) rotate(" + rot + 'deg)">' + d + "</button>";
+    });
+    $("grid").innerHTML = html;
+  }
+  function now() { return (performance.now() - t0) / 1000 + extra; }
+  function tick() {
+    if (state !== "run") return;
+    $("time").textContent = now().toFixed(1) + "s";
+    raf = requestAnimationFrame(tick);
+  }
+  function flash() { var f = $("flash"); f.classList.add("on"); void f.offsetWidth; f.classList.remove("on"); }
+  function reset() {
+    gen++; cancelAnimationFrame(raf); state = "intro"; seq = makeSeq(); pos = 0; extra = 0;
+    $("time").textContent = "0.0s"; $("time").className = "time off"; $("intro").hidden = false; $("result").hidden = true;
+    renderSeq(); layoutGrid();
+  }
+  function start() {
+    state = "run"; $("intro").hidden = true; $("time").className = "time"; t0 = performance.now(); extra = 0;
+    renderSeq(); tick();
+  }
+  function finish() {
+    state = "done"; cancelAnimationFrame(raf);
+    var t = Math.round(now() * 100) / 100;
+    $("time").textContent = t.toFixed(1) + "s";
+    var rec = !best || t < best;
+    if (rec) { best = t; try { localStorage.setItem("zahlenfolge-best", String(best)); } catch (e) {} showBest(); }
+    $("rec").hidden = !rec; $("pts").textContent = t.toFixed(2) + "s";
+    var g = gen; setTimeout(function () { if (g === gen) $("result").hidden = false; }, 500);
+  }
+  $("grid").addEventListener("pointerdown", function (e) {
+    var b = e.target.closest(".tile"); if (!b || state !== "run") return;
+    e.preventDefault();
+    var d = +b.getAttribute("data-d");
+    if (d === seq[pos]) {
+      pos++; renderSeq();
+      if (pos >= LEN) finish(); else layoutGrid();
+    } else { extra += PENALTY; flash(); if (navigator.vibrate) { try { navigator.vibrate(40); } catch (x) {} } }
+  });
+  $("intro").addEventListener("pointerdown", function (e) { e.preventDefault(); if (state === "intro") start(); });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap($("reset"), reset); bindTap($("ok"), reset);
+  reset();
+  window.__zf = { get s() { return { state: state, seq: seq, pos: pos, t: now() }; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
