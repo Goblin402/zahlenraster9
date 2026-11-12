@@ -54,14 +54,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 (function () {
   // Aus der Aufnahme (Bild für Bild) gemessen, Bildschirm 585 x 1266:
   // Zielscheibe Radius 64 px (0,109 Breiten), Ring bei 69 px; Mitten x 78–503, y 488–1184.
+  // Nachgemessen mit 3 Läufen (464 Ziele, bis 48 s): Lebensdauer 2,38 / 1,54 / 0,93 / 0,76 s bei 2,5 / 17,5 / 37,5 / 47,5 s,
+  // Abstand 0,48 / 0,33 / 0,22 / 0,18 s – beide flachen gegen Ende ab, daher Exponential + Sockel.
   // Zeitring von 170 Zielen Grad für Grad vermessen (Fehler der Geraden < 1 %):
   // Lebensdauer 2,46 s am Anfang, 1,35 s nach 22 s, 0,75 s nach 46 s  ->  2,465 * e^(-0,0266 t)
   // Abstand zwischen neuen Zielen (Startzeit jedes Ziels aus seinem Ring zurückgerechnet, 169 Ziele):
   // 0,47 s am Anfang, 0,30 s nach 22 s, 0,18 s nach 46 s  ->  0,481 * e^(-0,02125 t); erstes Ziel 0,43 s nach dem Start-Tipp
   // Ring wird orange, sobald weniger als 60 % übrig sind. Ziel springt in 0,12 s mit kleinem Überschwingen auf.
   var R0 = 64 / 585, RING = 69 / 585, X0 = 78 / 585, X1 = 503 / 585, Y0 = 488 / 1266, Y1 = 1184 / 1266, LIVES = 3, HIT_PAD = 1.12;
-  function interval(t) { return 0.481 * Math.exp(-0.02125 * t); }
-  function life(t) { return 2.465 * Math.exp(-0.0266 * t); }
+  function interval(t) { return 0.0588 + 0.4499 * Math.exp(-0.0283 * t); }
+  function life(t) { return 0.337 + 2.2395 * Math.exp(-0.0356 * t); }
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
   function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
   window.addEventListener("resize", layout); layout();
