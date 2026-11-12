@@ -53,7 +53,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 <script>
 (function () {
   // Welt in Metern (y nach oben). Bildschirm: 1 m = PXM * Höhe.
-  var PXM = 21.4 / 844, BIRD_Y = 0.65, FLAP_UP = 11, GRAV = 16, FLAP_SIDE = 0.27, BIRD_R = 0.034;
+  var PXM = 21.4 / 844, BIRD_Y = 0.70, CAM_TAU = 0.3, FLAP_UP = 11, GRAV = 16, FLAP_SIDE = 0.27, BIRD_R = 0.034;
   var SEG = 3.2;                 // Länge eines Wandstücks in m
   function width(m) { return Math.max(0.27, 0.70 - 0.0024 * m); } // in Bildbreiten
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
@@ -120,7 +120,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     bird.flap = Math.max(0, bird.flap - dt);
     if (bird.y > top) top = bird.y;
     // Kamera folgt nur nach oben
-    var camT = bird.y; if (camT > cam) cam = camT;
+    // Kamera folgt weich (Tiefpass), damit das Bild auch bei schnellem Tippen gleichmäßig hochgleitet;
+    // der Vogel wippt dadurch leicht auf dem Bildschirm (im Original ~±20 px), das Bild ruckelt nicht.
+    if (bird.y > cam) cam += (bird.y - cam) * (1 - Math.exp(-dt / CAM_TAU));
     extend(cam + 60);
     var c = canyonAt(bird.y), rx = BIRD_R * Ws / Ws;
     if (bird.x - BIRD_R < c[0] || bird.x + BIRD_R > c[1]) { crash(); return; }
@@ -206,7 +208,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   bindTap(document.getElementById("ok"), reset);
   reset();
   requestAnimationFrame(function (t) { last = t; frame(t); });
-  window.__cu = { get s() { return { state: state, top: top, bird: bird, c: canyonAt(bird.y), wind: wind }; }, flap: function (d) { if (state === "idle") state = "run"; flap(d); }, canyon: function (y) { return canyonAt(y); } };
+  window.__cu = { get s() { return { state: state, top: top, cam: cam, bird: bird, c: canyonAt(bird.y), wind: wind }; }, flap: function (d) { if (state === "idle") state = "run"; flap(d); }, canyon: function (y) { return canyonAt(y); } };
 })();
 </script>
 <style>
