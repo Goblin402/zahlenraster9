@@ -64,7 +64,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
   function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
   window.addEventListener("resize", layout); layout();
-  var state = "idle", t0 = 0, stopT = 0, best = 0, gen = 0;
+  var state = "idle", t0 = 0, stopT = 0, best = 0, gen = 0, recNow = false;
   // Übungsmodus "5": Timer startet schon bei 5,00 s, eigener Highscore
   var from5 = false, fastBtn = document.getElementById("fast");
   try { from5 = localStorage.getItem("siebensek-5") === "1"; } catch (e) {}
@@ -84,7 +84,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (rec) { best = Math.round(sc * 100) / 100; try { localStorage.setItem(key(), String(best)); } catch (e) {} showBest2(); }
     document.getElementById("rec").hidden = !rec;
     document.getElementById("pts").textContent = shown;
-    setTimeout(function () { if (g === gen) document.getElementById("result").hidden = false; }, 1600);
+    recNow = rec; // kein Ergebnis-Fenster: Ergebnis steht unter dem Ring, nächster Tipp startet sofort den nächsten Lauf
   }
   function reset() { gen++; state = "idle"; stopT = 0; document.getElementById("result").hidden = true; }
   function draw() {
@@ -105,6 +105,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.font = "800 " + Math.round(Ws * 0.05) + "px " + font;
     var hint = state === "stop" ? "UM " + Math.abs(stopT - TARGET).toFixed(4) + "s DANEBEN" : state === "late" ? "ZU SPÄT" : "BEI 7 TIPPEN";
     if (state !== "idle") ctx.fillText(hint, cx, Hs * HINT_Y);
+    if (state === "stop" && recNow) { ctx.fillStyle = "#ffd34d"; ctx.font = "800 " + Math.round(Ws * 0.04) + "px " + font; ctx.fillText("NEUER REKORD", cx, Hs * HINT_Y + Ws * 0.08); ctx.fillStyle = "#fff"; }
     if (state === "idle") {
       ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0, 0, Ws, Hs);
       ctx.fillStyle = "#fff"; ctx.font = "800 " + Math.round(Ws * 0.068) + "px " + font;
@@ -135,7 +136,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   document.addEventListener("pointerdown", function (e) {
     if (ui(e)) return; e.preventDefault();
     if (state === "idle") { state = "run"; t0 = performance.now() - startAt() * 1000; return; }
-    if (state === "run") { stopT = (performance.now() - t0) / 1000; state = "stop"; finish(false); }
+    if (state === "run") { stopT = (performance.now() - t0) / 1000; state = "stop"; finish(false); return; }
+    if (state === "stop" || state === "late") { recNow = false; state = "run"; t0 = performance.now() - startAt() * 1000; }
   });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
   bindTap(document.getElementById("reset"), reset);
