@@ -93,13 +93,14 @@ body { background: #1c1d26; color: #fff; font-family: var(--font); font-weight: 
   // Gitter neu mischen; manchmal (später öfter und stärker) verrutscht und schief
   function layoutGrid() {
     var digits = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]), messy = state === "run" && Math.random() < 0.15 + 0.06 * pos;
-    var amp = messy ? 0.05 + 0.012 * pos : 0;
+    // verrutscht: höchstens ~1/4 Kachelabstand (am Ende), damit sich Kacheln nur leicht überlappen
+    var pitch = 0.241 * window.innerWidth, off = messy ? (0.10 + 0.022 * pos) * pitch : 0;
     var html = "";
     digits.forEach(function (d, i) {
       var x = COLS_X[i % 3], y = ROWS_Y[Math.floor(i / 3)];
-      var dx = (Math.random() - 0.5) * 2 * amp, dy = (Math.random() - 0.5) * 2 * amp * 0.6, rot = messy ? (Math.random() - 0.5) * 16 : 0;
+      var dx = (Math.random() - 0.5) * 2 * off / window.innerWidth, dy = (Math.random() - 0.5) * 2 * off / window.innerHeight, rot = messy ? (Math.random() - 0.5) * 14 : 0;
       html += '<button class="tile" type="button" data-d="' + d + '" style="left:' + ((x + dx) * 100) + "%;top:" + ((y + dy) * 100) + "%;background:" + COL[d] +
-        ";transform:translate(-50%,-50%) rotate(" + rot + 'deg)">' + d + "</button>";
+        ";z-index:" + (d === seq[pos] ? 3 : 1) + ";transform:translate(-50%,-50%) rotate(" + rot + 'deg)">' + d + "</button>";
     });
     $("grid").innerHTML = html;
   }
