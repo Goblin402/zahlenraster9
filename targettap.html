@@ -52,9 +52,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </div>
 <script>
 (function () {
-  var DIAM = 44 / 390, X0 = 52 / 390, X1 = 335 / 390, Y0 = 325 / 844, Y1 = 757 / 844, LIVES = 3, HIT_PAD = 1.2;
-  function rate(t) { return 2.2 + 0.06 * t; }               // neue Ziele pro Sekunde
-  function life(t) { return Math.max(0.85, 2.0 - 0.025 * t); } // Sekunden bis das Ziel verschwindet
+  // Aus der Aufnahme (Bild für Bild) gemessen, Bildschirm 585 x 1266:
+  // Zielscheibe Radius 64 px (0,109 Breiten), Ring bei 69 px; Mitten x 78–503, y 488–1184.
+  // Abstand zwischen neuen Zielen: 0,50 s am Anfang, 0,40 s nach 9 s, 0,30 s nach 21 s, 0,18 s nach 45 s.
+  // Lebensdauer eines Ziels: ~1,15 s am Anfang, ~0,7 s nach 16 s, ~0,5 s nach 44 s (abgelaufene Ziele am Ende).
+  // Ring wird orange, wenn weniger als die Hälfte der Zeit übrig ist. Ziel springt in 0,12 s mit kleinem Überschwingen auf.
+  var R0 = 64 / 585, RING = 69 / 585, X0 = 78 / 585, X1 = 503 / 585, Y0 = 488 / 1266, Y1 = 1184 / 1266, LIVES = 3, HIT_PAD = 1.12;
+  function interval(t) { return 0.5 * Math.exp(-t / 43); }
+  function life(t) { return 0.5 + 0.65 * Math.exp(-t / 15); }
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, dpr;
   function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
   window.addEventListener("resize", layout); layout();
@@ -65,11 +70,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
   function spawn() {
-    var r = DIAM * Ws / 2, x, y, ok, tries = 0;
+    var r = R0 * Ws, x, y, ok, tries = 0;
     do {
       x = (X0 + Math.random() * (X1 - X0)) * Ws; y = (Y0 + Math.random() * (Y1 - Y0)) * Hs; ok = true;
-      for (var i = 0; i < targets.length; i++) if (Math.hypot(targets[i].x - x, targets[i].y - y) < r * 2.4) { ok = false; break; }
-    } while (!ok && ++tries < 30);
+      for (var i = 0; i < targets.length; i++) if (Math.hypot(targets[i].x - x, targets[i].y - y) < RING * Ws * 2 + 6) { ok = false; break; }
+    } while (!ok && ++tries < 80);
     targets.push({ x: x, y: y, age: 0, life: life(t) });
   }
   function reset() {
@@ -88,8 +93,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     fx.forEach(function (f) { f.a += dt; }); fx = fx.filter(function (f) { return f.a < 0.3; });
     hurt = Math.max(0, hurt - dt);
     if (state !== "run") return;
-    t += dt; spawnAcc += rate(t) * dt;
-    while (spawnAcc >= 1) { spawnAcc -= 1; spawn(); }
+    t += dt; spawnAcc -= dt;
+    while (spawnAcc <= 0) { spawn(); spawnAcc += interval(t); }
     for (var i = targets.length - 1; i >= 0; i--) {
       var g = targets[i]; g.age += dt;
       if (g.age >= g.life) {
@@ -101,7 +106,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   function bull(x, y, r, alpha) {
     ctx.globalAlpha = alpha;
-    [["#e23a3a", 1], ["#fff", 0.74], ["#e23a3a", 0.5], ["#fff", 0.28], ["#e23a3a", 0.12]].forEach(function (c) {
+    [["#d92424", 1], ["#ffffff", 0.70], ["#d92424", 0.41], ["#ffffff", 0.16]].forEach(function (c) {
       ctx.fillStyle = c[0]; ctx.beginPath(); ctx.arc(x, y, r * c[1], 0, 7); ctx.fill();
     });
     ctx.globalAlpha = 1;
@@ -110,13 +115,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#1c2331"; ctx.fillRect(0, 0, Ws, Hs);
     if (hurt > 0) { ctx.fillStyle = "rgba(220,50,60," + (hurt * 0.6) + ")"; ctx.fillRect(0, 0, Ws, Hs); }
-    var r = DIAM * Ws / 2;
+    var r = R0 * Ws;
     targets.forEach(function (g) {
-      var pop = Math.min(1, g.age / 0.08), k = 1 - g.age / g.life;
-      bull(g.x, g.y, r * (0.6 + 0.4 * pop), 1);
-      // Restzeit-Ring
-      ctx.strokeStyle = "#35c46a"; ctx.lineWidth = Math.max(2, r * 0.13);
-      ctx.beginPath(); ctx.arc(g.x, g.y, r * 1.12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+      // Aufspringen: 0,4 -> 1,06 in 0,05 s, dann auf 1,0 bis 0,12 s
+      var a = g.age, sc = a < 0.05 ? 0.4 + 0.66 * (a / 0.05) : a < 0.12 ? 1.06 - 0.06 * ((a - 0.05) / 0.07) : 1;
+      bull(g.x, g.y, r * sc, 1);
+      var k = Math.max(0, 1 - g.age / g.life);
+      ctx.strokeStyle = k > 0.5 ? "#1fa64f" : "#c4710a"; ctx.lineWidth = Math.max(2.2, Ws * 0.0075);
+      ctx.beginPath(); ctx.arc(g.x, g.y, RING * Ws * sc, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
     });
     fx.forEach(function (f) {
       var p = f.a / 0.3;
@@ -124,17 +130,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       else bull(f.x, f.y, r * (1 + 0.5 * p), 0.55 * (1 - p));
     });
     // Leben + Punkte
-    var font = getComputedStyle(document.body).fontFamily, hy = Hs * 0.29;
+    var font = getComputedStyle(document.body).fontFamily, hy = Hs * (370 / 1266);
     ctx.textBaseline = "middle"; ctx.textAlign = "left";
     for (var i = 0; i < LIVES; i++) {
-      var hx = Ws * 0.05 + i * Ws * 0.06;
+      var hx = Ws * (69 / 585) + i * Ws * (50 / 585);
       ctx.fillStyle = i < lives ? "#ff5a6a" : "rgba(255,255,255,0.18)";
-      ctx.beginPath(); var s = Ws * 0.024;
+      ctx.beginPath(); var s = Ws * 0.03;
       ctx.moveTo(hx, hy + s * 0.9); ctx.bezierCurveTo(hx - s * 1.4, hy - s * 0.1, hx - s * 0.6, hy - s * 1.2, hx, hy - s * 0.35);
       ctx.bezierCurveTo(hx + s * 0.6, hy - s * 1.2, hx + s * 1.4, hy - s * 0.1, hx, hy + s * 0.9); ctx.fill();
     }
     ctx.fillStyle = state === "idle" ? "rgba(255,255,255,0.45)" : "#fff";
-    ctx.font = "800 " + Math.round(Ws * 0.085) + "px " + font; ctx.fillText(String(score), Ws * 0.24, hy + 2);
+    ctx.textAlign = "center"; ctx.font = "800 " + Math.round(Ws * 0.17) + "px " + font; ctx.fillText(String(score), Ws / 2, hy + 4);
     if (state === "idle") {
       ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "800 " + Math.round(Math.min(Ws * 0.06, 26)) + "px " + font;
       ctx.fillText("Tippen zum Start", Ws / 2, Hs * 0.55);
@@ -145,9 +151,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
   document.addEventListener("pointerdown", function (e) {
     if (ui(e)) return; e.preventDefault();
-    if (state === "idle") { state = "run"; spawn(); return; }
+    if (state === "idle") { state = "run"; spawnAcc = 0; return; }
     if (state !== "run") return;
-    var r = DIAM * Ws / 2 * HIT_PAD, bestI = -1, bd = 1e9;
+    var r = R0 * Ws * HIT_PAD, bestI = -1, bd = 1e9;
     for (var i = 0; i < targets.length; i++) { var d = Math.hypot(targets[i].x - e.clientX, targets[i].y - e.clientY); if (d < r && d < bd) { bd = d; bestI = i; } }
     if (bestI >= 0) { var g = targets.splice(bestI, 1)[0]; fx.push({ x: g.x, y: g.y, a: 0 }); score++; }
   });
