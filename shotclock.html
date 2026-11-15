@@ -1,0 +1,324 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Shot Clock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Shot Clock: Tippen = Ball springt hoch und fliegt Richtung Korb. Jeder Korb +1 Punkt, Uhr wieder voll, Korb springt woanders hin.
+   Aus der Aufnahme gemessen (390 x 844): Ball r 20 px, Boden bei 665 px, Korb 82 px breit, Ring oben bei 462–576 px, Mitte 65–285 px.
+   Wurf: senkrecht 370 px/s nach oben, waagerecht 151 px/s (+8,2 pro Punkt bis 8, danach +3,5); Schwerkraft 556 -> ~780 px/s².
+   Uhr: 10,28 s - 0,348 s pro Punkt. Läuft sie ab, geht es in Zeitlupe (halbes Tempo) weiter: Korb = weiter, Boden = vorbei. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: light; }
+html, body { height: 100%; }
+body { background: #f5ebdc; color: #4a260c; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(74, 38, 12, 0.85); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #4a260c; outline-offset: 2px; }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(30, 12, 4, 0.88); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #c8501f; color: #fff; border: 2px solid #ff9a5c; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  // Welt in "u" = Pixel bei 390 px Breite; senkrechte Lagen als Anteil der Bildhöhe (gemessen bei 844)
+  var BALL_R = 20, FLOOR_F = 665 / 844, RIM_W = 82, RIM_H = 23, RIM_T = 4, POLE_W = 10, POLE_H = 109, NET_H = 62;
+  var JUMP = 370, REST_FLOOR = 0.55, REST_RIM = 0.55, SLOW = 0.5, SLOW_MAX = 5;
+  var HX0 = 65, HX1 = 285, HY0 = 462 / 844, HY1 = 576 / 844;
+  function vxFor(n) { return n <= 8 ? 151 + 8.2 * n : Math.min(270, 216.6 + 3.5 * (n - 8)); }
+  function gFor(n) { return 556 + 225 * (1 - Math.exp(-n / 4)); }
+  function clockFor(n) { return Math.max(2.2, 10.28 - 0.348 * n); }
+  var C_WALL = "#f5ebdc", C_COURT = "#aa3817", C_LINE = "#fffaf2", C_RIM = "#f04f25", C_RIM2 = "#ff6a3a", C_POLE = "#c06818";
+
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, Hu, S, dpr;
+  function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; S = Ws / 390; Hu = Hs / S;
+    cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
+  window.addEventListener("resize", layout); layout();
+
+  var state, score, ball, hoop, clock, clockMax, timerOn, slowT, best = 0, gen = 0, trail, pop, spin, shake;
+  try { best = parseInt(localStorage.getItem("shotclock-best"), 10) || 0; } catch (e) {}
+  var bestEl = document.getElementById("best");
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function floorY() { return FLOOR_F * Hu; }
+  function newHoop(first) {
+    var x, y, k = 0;
+    do {
+      x = first ? 293 : HX0 + Math.random() * (HX1 - HX0);
+      y = first ? 420 / 844 * Hu : (HY0 + Math.random() * (HY1 - HY0)) * Hu;
+      k++;
+    } while (!first && k < 30 && ball && Math.abs(x - ball.x) < 90 && Math.abs(y - ball.y) < 140);
+    hoop = { x: x, y: y, side: x < 195 ? -1 : 1, t: 0 };
+  }
+  function reset() {
+    gen++; state = "intro"; score = 0; timerOn = false; clock = 0; clockMax = 1; slowT = 0; trail = []; pop = []; spin = 0; shake = 0;
+    ball = { x: 86, y: 525 / 844 * Hu, vx: 0, vy: 0, live: false, scored: false };
+    newHoop(true);
+    document.getElementById("result").hidden = true;
+  }
+  function over() {
+    state = "over";
+    var rec = score > best;
+    if (rec) { best = score; try { localStorage.setItem("shotclock-best", String(best)); } catch (e) {} showBest(); }
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("pts").textContent = score + " Pts";
+    var g = gen; setTimeout(function () { if (g === gen) document.getElementById("result").hidden = false; }, 900);
+  }
+  function tap() {
+    if (state === "intro") state = "run";
+    if (state !== "run") return;
+    ball.live = true;
+    ball.vy = -JUMP;
+    ball.vx = (hoop.x >= ball.x ? 1 : -1) * vxFor(score);
+    trail = [];
+    ball.trailT = 0.35;
+    if (navigator.vibrate) { try { navigator.vibrate(6); } catch (e) {} }
+  }
+  // Ring-Enden (Punkte) und Stange als Hindernisse
+  function rimEnds() { var cy = hoop.y + RIM_H * 0.45; return [[hoop.x - RIM_W / 2 + RIM_T, cy], [hoop.x + RIM_W / 2 - RIM_T, cy]]; }
+  function pole() { var x = hoop.side < 0 ? hoop.x - RIM_W / 2 - POLE_W : hoop.x + RIM_W / 2; return { x0: x, x1: x + POLE_W, y0: hoop.y + RIM_H - POLE_H, y1: hoop.y + RIM_H }; }
+  function collide() {
+    var e = rimEnds();
+    for (var i = 0; i < 2; i++) {
+      var dx = ball.x - e[i][0], dy = ball.y - e[i][1], d = Math.hypot(dx, dy), m = BALL_R + RIM_T;
+      if (d < m && d > 0) {
+        var nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+        if (vn < 0) { ball.vx -= (1 + REST_RIM) * vn * nx; ball.vy -= (1 + REST_RIM) * vn * ny; }
+        ball.x = e[i][0] + nx * m; ball.y = e[i][1] + ny * m;
+      }
+    }
+    var p = pole();
+    var cx = Math.max(p.x0, Math.min(ball.x, p.x1)), cy = Math.max(p.y0, Math.min(ball.y, p.y1));
+    var ddx = ball.x - cx, ddy = ball.y - cy, dd = Math.hypot(ddx, ddy);
+    if (dd < BALL_R && dd > 0) {
+      var qx = ddx / dd, qy = ddy / dd, qn = ball.vx * qx + ball.vy * qy;
+      if (qn < 0) { ball.vx -= (1 + REST_RIM) * qn * qx; ball.vy -= (1 + REST_RIM) * qn * qy; }
+      ball.x = cx + qx * BALL_R; ball.y = cy + qy * BALL_R;
+    }
+  }
+  function step(dt) {
+    var g = gFor(score), py = ball.y;
+    ball.vy += g * dt; ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+    // links/rechts aus dem Bild = auf der anderen Seite wieder rein
+    if (ball.x < -BALL_R) ball.x += 390 + 2 * BALL_R;
+    if (ball.x > 390 + BALL_R) ball.x -= 390 + 2 * BALL_R;
+    collide();
+    // Korb: Mitte des Balls fällt durch die Ringebene zwischen den Ring-Enden
+    var plane = hoop.y + RIM_H * 0.45;
+    if (py < plane && ball.y >= plane && ball.vy > 0 && Math.abs(ball.x - hoop.x) < RIM_W / 2 - RIM_T) basket();
+    var fy = floorY();
+    if (ball.y > fy) {
+      ball.y = fy;
+      if (state === "slow") { over(); return; }
+      ball.vy = -ball.vy * REST_FLOOR; if (Math.abs(ball.vy) < 40) ball.vy = 0;
+      ball.vx *= 0.97;
+    }
+  }
+  function basket() {
+    score++;
+    pop.push({ x: hoop.x, y: hoop.y, t: 0 });
+    clockMax = clockFor(score); clock = clockMax; timerOn = true;
+    if (state === "slow") state = "run";
+    oldHoop = { x: hoop.x, y: hoop.y, side: hoop.side, t: 0 };
+    newHoop(false);
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+  }
+  var oldHoop = null;
+  function update(dt) {
+    if (hoop) hoop.t += dt;
+    if (oldHoop) { oldHoop.t += dt; if (oldHoop.t > 0.35) oldHoop = null; }
+    for (var i = pop.length - 1; i >= 0; i--) { pop[i].t += dt; if (pop[i].t > 0.8) pop.splice(i, 1); }
+    if (state === "run" || state === "slow") {
+      var k = state === "slow" ? SLOW : 1, sdt = dt * k;
+      if (timerOn && state === "run") { clock -= dt; if (clock <= 0) { clock = 0; state = "slow"; slowT = 0; } }
+      if (state === "slow") { slowT += dt; if (slowT > SLOW_MAX) { over(); return; } }
+      if (ball.live) {
+        var n = Math.ceil(sdt / 0.004);
+        for (var j = 0; j < n && (state === "run" || state === "slow"); j++) step(sdt / n);
+        spin += ball.vx * sdt / BALL_R;
+        if (ball.trailT > 0) { ball.trailT -= sdt; trail.push([ball.x, ball.y]); if (trail.length > 10) trail.shift(); } else if (trail.length) trail.shift();
+      }
+    }
+  }
+  // Zeichnen
+  function U(v) { return v * S; }
+  function drawCourt() {
+    ctx.fillStyle = C_WALL; ctx.fillRect(0, 0, Ws, Hs);
+    var b = [[533, 551, "#fbcd6a"], [551, 575, "#f09f52"], [575, 596, "#df6331"], [596, 600, C_LINE], [600, 2000, C_COURT]];
+    b.forEach(function (r) { ctx.fillStyle = r[2]; ctx.fillRect(0, r[0] / 844 * Hs, Ws, (r[1] - r[0]) / 844 * Hs + 1); });
+    ctx.strokeStyle = C_LINE; ctx.lineWidth = U(3);
+    var top = 600 / 844 * Hs;
+    ctx.beginPath(); ctx.ellipse(Ws / 2, top + U(82), U(118), U(54), 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(U(46), top); ctx.lineTo(Ws / 2 - U(26), top + U(150)); ctx.moveTo(Ws - U(46), top); ctx.lineTo(Ws / 2 + U(26), top + U(150)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, top + U(150)); ctx.lineTo(U(46), top + U(118)); ctx.moveTo(Ws, top + U(150)); ctx.lineTo(Ws - U(46), top + U(118)); ctx.stroke();
+  }
+  function drawHoopBack(h, a) {
+    var sc = Math.min(1, 0.35 + h.t / 0.12 * 0.65);
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(U(h.x), U(h.y + RIM_H / 2)); ctx.scale(sc, sc); ctx.translate(-U(h.x), -U(h.y + RIM_H / 2));
+    // Stange
+    var px = h.side < 0 ? h.x - RIM_W / 2 - POLE_W : h.x + RIM_W / 2;
+    ctx.fillStyle = "#fff8ee"; ctx.fillRect(U(px), U(h.y + RIM_H - POLE_H), U(POLE_W), U(POLE_H));
+    ctx.fillStyle = C_POLE; ctx.fillRect(U(h.side < 0 ? px : px + POLE_W - 3), U(h.y + RIM_H - POLE_H), U(3), U(POLE_H));
+    ctx.fillRect(U(h.side < 0 ? px : h.x + RIM_W / 2 - 4), U(h.y + RIM_H - 7), U(POLE_W + 4), U(7));
+    // hintere Ringhälfte
+    ctx.strokeStyle = C_RIM; ctx.lineWidth = U(6);
+    ctx.beginPath(); ctx.ellipse(U(h.x), U(h.y + RIM_H / 2), U(RIM_W / 2 - 3), U(RIM_H / 2 - 3), 0, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  function drawHoopFront(h, a) {
+    var sc = Math.min(1, 0.35 + h.t / 0.12 * 0.65);
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(U(h.x), U(h.y + RIM_H / 2)); ctx.scale(sc, sc); ctx.translate(-U(h.x), -U(h.y + RIM_H / 2));
+    // Netz
+    var cy = h.y + RIM_H / 2, t = cy + 2, bt = cy + NET_H, wT = RIM_W / 2 - 5, wB = RIM_W / 2 - 14;
+    ctx.strokeStyle = "rgba(255,252,246,0.95)"; ctx.lineWidth = U(2.2);
+    for (var i = 0; i <= 8; i++) { var f = i / 8 * 2 - 1; ctx.beginPath(); ctx.moveTo(U(h.x + f * wT), U(t)); ctx.lineTo(U(h.x + f * wB), U(bt)); ctx.stroke(); }
+    for (var j = 1; j <= 4; j++) { var q = j / 4, yy = t + (bt - t) * q, ww = wT + (wB - wT) * q; ctx.beginPath(); ctx.moveTo(U(h.x - ww), U(yy)); ctx.lineTo(U(h.x + ww), U(yy)); ctx.stroke(); }
+    // vordere Ringhälfte
+    ctx.strokeStyle = C_RIM2; ctx.lineWidth = U(7);
+    ctx.beginPath(); ctx.ellipse(U(h.x), U(cy), U(RIM_W / 2 - 3), U(RIM_H / 2 - 3), 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function drawBall() {
+    var fy = floorY(), hgt = Math.max(0, fy - ball.y), sh = Math.max(0.35, 1 - hgt / 500);
+    ctx.fillStyle = "rgba(60,10,0," + (0.35 * sh) + ")";
+    ctx.beginPath(); ctx.ellipse(U(ball.x), (690 / 844) * Hs, U(15 * sh), U(4 * sh), 0, 0, Math.PI * 2); ctx.fill();
+    // Spur
+    for (var i = 0; i < trail.length; i++) {
+      var p = trail[i], a = (i + 1) / trail.length;
+      ctx.fillStyle = "rgba(255,214,120," + (0.35 * a) + ")"; ctx.beginPath(); ctx.arc(U(p[0]), U(p[1]), U(BALL_R * (0.5 + 0.4 * a)), 0, 7); ctx.fill();
+    }
+    var x = U(ball.x), y = U(ball.y), r = U(BALL_R);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    var gr = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
+    gr.addColorStop(0, "#f58a3a"); gr.addColorStop(1, "#c94c12");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#3a1606"; ctx.lineWidth = Math.max(1.2, r * 0.08);
+    ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-r * 1.25, 0, r * 0.95, -0.75, 0.75); ctx.stroke();
+    ctx.beginPath(); ctx.arc(r * 1.25, 0, r * 0.95, Math.PI - 0.75, Math.PI + 0.75); ctx.stroke();
+    ctx.restore();
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawCourt();
+    var font = getComputedStyle(document.body).fontFamily;
+    // Uhr-Balken
+    if (timerOn) {
+      var bx = 55 / 390 * Ws, bw = 280 / 390 * Ws, by = 211 / 844 * Hs, bh = U(10), f = Math.max(0, clock / clockMax);
+      ctx.fillStyle = "#cfc8ba"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, bh / 2); ctx.fill();
+      if (f > 0) { var gg = Math.round(Math.max(40, 207 - 219 * (1 - f))); ctx.fillStyle = "rgb(255," + gg + ",0)"; ctx.beginPath(); ctx.roundRect(bx, by, Math.max(bh, bw * f), bh, bh / 2); ctx.fill(); }
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#4a260c";
+    ctx.font = "800 " + Math.round(Ws * 0.15) + "px " + font; ctx.fillText(String(score), Ws / 2, Hs * 0.31);
+    if (oldHoop) { drawHoopBack(oldHoop, 1 - oldHoop.t / 0.35); }
+    drawHoopBack(hoop, 1);
+    drawBall();
+    if (oldHoop) drawHoopFront(oldHoop, 1 - oldHoop.t / 0.35);
+    drawHoopFront(hoop, 1);
+    pop.forEach(function (p) {
+      ctx.globalAlpha = Math.max(0, 1 - p.t / 0.8); ctx.fillStyle = "#c8501f"; ctx.font = "800 " + Math.round(Ws * 0.07) + "px " + font;
+      ctx.fillText("+1", U(p.x), U(p.y - 20 - 40 * p.t)); ctx.globalAlpha = 1;
+    });
+    if (state === "slow") { ctx.fillStyle = "rgba(170,56,23,0.10)"; ctx.fillRect(0, 0, Ws, Hs); }
+    if (state === "intro") {
+      ctx.fillStyle = "rgba(30,14,6,0.72)"; ctx.beginPath(); ctx.roundRect(0, Hs * 0.176, Ws, Hs, U(26)); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = "800 " + Math.round(Ws * 0.068) + "px " + font;
+      ctx.fillText("Tippen zum", Ws / 2 + U(10), Hs * 0.6); ctx.fillText("Werfen", Ws / 2 + U(10), Hs * 0.632);
+      var pu = 0.5 + 0.5 * Math.sin(performance.now() / 1000 * 4);
+      ctx.fillStyle = "rgba(255,255,255," + (0.3 + 0.5 * pu) + ")"; ctx.beginPath(); ctx.arc(Ws / 2, Hs * 0.82, U(22 + 4 * pu), 0, 7); ctx.fill();
+    }
+  }
+  var last = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); draw();
+  }
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) { if (ui(e)) return; e.preventDefault(); tap(); });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+  reset();
+  requestAnimationFrame(function (n) { last = n; frame(n); });
+  window.__sc = { get s() { return { state: state, score: score, ball: ball, hoop: hoop, clock: clock, Hu: Hu }; }, tap: tap };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>

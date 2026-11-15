@@ -19,8 +19,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
 <style>
 /* Keep Up: rundes Pad unten links/rechts ziehen, Ball abprallen lassen. Ein Fehler = vorbei.
-   Gemessen: Pad-Durchmesser 25 % der Breite, Mitte bei 92 % Höhe; Ball 4,3 % der Breite;
-   Sprunghöhe ~55 % der Bildhöhe; Zeit zwischen zwei Treffern 1,9 s am Anfang, ~1,0 s ab 11 Punkten, ~0,85 s ab 24. */
+   Gemessen (5 Läufe, 1170 x 2532): Pad-Durchmesser 25 % der Breite, Mitte bei 92,6 % Höhe; Ball 6,15 % der Breite;
+   Schwerkraft bleibt gleich (1,153 Bildhöhen/s²), nur der Abschuss wird pro Punkt schneller:
+   1,081 + 0,0258 * Punkte Bildhöhen/s. Anfangs erreicht der Ball die Decke nicht, ab ~3 Punkten prallt er oben ab. */
 :root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
 html, body { height: 100%; }
 body { background: #1f2026; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
@@ -52,15 +53,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 </div>
 <script>
 (function () {
-  var PAD_D = 0.25, PAD_Y = 0.92, BALL_D = 0.043, START_Y = 0.36, CARRY = 0.3, SIDE = 3.6;
-  // Decke: weiße Linie bei 331/1266 der Höhe, der Ball prallt dort ab. HOP_K = wie weit der Wurf über die Decke hinaus ginge.
-  var CEIL = 331 / 1266, HOP_K = 1.15;
-  // Zeit von Treffer zu Treffer (s) je nach Punktestand
-  function period(s) {
-    if (s <= 3) return 1.9;
-    if (s <= 11) return 1.9 - (s - 3) * 0.11;
-    return Math.max(0.7, 1.02 - (s - 11) * 0.0135);
-  }
+  var PAD_D = 0.25, PAD_Y = 0.926, BALL_D = 0.0615, START_Y = 0.36, CARRY = 0.3, SIDE = 3.6;
+  // Decke: weiße Linie bei 331/1266 der Höhe, der Ball prallt dort ab.
+  var CEIL = 331 / 1266, GRAV = 1.153;
+  // Abschussgeschwindigkeit (Bildhöhen/s) nach einem Treffer, je nach Punktestand
+  function launch(s) { return Math.min(2.6, 1.081 + 0.02583 * s); }
+  function tempo(s) { return launch(s) / launch(0); }
   var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
   var Ws, Hs, dpr, R, r, padY;
   function layout() {
@@ -75,11 +73,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   var bestEl = document.getElementById("best");
   function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best : "--"); }
   showBest();
-  function setSpeed() {
-    // Zeit Pad -> Decke -> Pad soll period(score) ergeben
-    var T = period(score), D = (padY - R - r) - (CEIL * Hs + r), q = Math.sqrt(HOP_K) - Math.sqrt(HOP_K - 1);
-    g = 8 * D * q * q / (T * T); v0 = Math.sqrt(2 * g * HOP_K * D);
-  }
+  function setSpeed() { g = GRAV * Hs; v0 = launch(score) * Hs; }
   function reset() {
     gen++; state = "idle"; score = 0; padX = Ws / 2; trail = [];
     ball = { x: Ws / 2, y: Hs * START_Y, vx: 0, vy: 0 };
@@ -103,7 +97,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (ball.vy > 0 && dy < 0 && Math.hypot(dx, dy) < R + r) {
       score++; setSpeed();
       var off = Math.max(-1, Math.min(1, dx / R));
-      ball.vx = CARRY * ball.vx + off * SIDE * Ws / period(score);
+      ball.vx = CARRY * ball.vx + off * SIDE * Ws / 1.9 * tempo(score);
       ball.vy = -v0;
       // nur beim ersten Treffer: kleiner Zufalls-Drall, damit der Ball nicht endlos senkrecht springt
       if (score === 1) ball.vx += (Math.random() < 0.5 ? -1 : 1) * (0.002 + Math.random() * 0.001) * Ws;
