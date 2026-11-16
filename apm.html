@@ -391,7 +391,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       s += '<g id="k-hand' + side + '"><path d="M-10,60 Q-15,76 -11,90 Q-6,101 4,100 Q14,98 14,86 L13,60 Z" fill="' + SK + '" ' + S + '/>' +
         '<path d="M-3,80 L-2,95 M3.5,81 L4.5,97" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-linecap="round"/>' +
         '<path d="M-10,66 Q-19,70 -18,80 Q-15,85 -10,80" fill="' + SK + '" ' + S + '/></g>';
-      if (!watch) s += '<g id="k-point" opacity="0"><path d="M-3,82 L-3,96 Q0,100 3,96 L3,82 Z" fill="' + SK + '" ' + S + '/>' +
+      if (!watch) s += '<g id="k-point" opacity="0"><path id="k-fs" d="M-3,82 L-3,96 Q0,100 3,96 L3,82 Z" fill="' + SK + '" ' + S + '/>' +
+        '<path id="k-fl" d="M-3,82 L-3,110 Q0,115 3,110 L3,82 Z" fill="' + SK + '" ' + S + ' opacity="0"/>' +
         '<path d="M-10,60 Q-14,74 -9,86 L10,86 Q14,74 13,60 Z" fill="' + SK + '" ' + S + '/><path d="M-6,72 L9,72 M-6,79 L9,79" stroke="' + INK + '" stroke-width="1.4"/></g>';
       return s + '</g></g>';
     }
@@ -447,7 +448,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       return s;
     }
     function bind() {
-      ["man", "legL", "legR", "shoeL", "upper", "back", "front", "head", "armL", "foreL", "armR", "foreR", "handL", "point", "phone", "earR", "earL", "earIn", "red",
+      ["man", "legL", "legR", "shoeL", "upper", "back", "front", "head", "armL", "foreL", "armR", "foreR", "handL", "point", "fs", "fl", "phone", "earR", "earL", "earIn", "red",
        "nose", "naso", "mouth", "lip", "chin", "crease", "cheek", "mark", "ce0", "ce1", "ew0", "ew1", "eo0", "eo1", "pu0", "pu1",
        "lid0", "lid1", "ll0", "ll1", "br0", "br1", "bag0", "bag1", "st0", "st1", "st2", "st3", "st4", "st5"].forEach(function (k) { el[k] = document.getElementById("k-" + k); });
       el.back.appendChild(el.armR);   // hinterer Arm hängt hinter dem Körper
@@ -460,7 +461,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         turn: C(0, 55, .82), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 95, .5),
         anger: C(.85, 14, 1), red: C(0, 4, 1), steam: C(0, 3, 1), mark: C(0, 60, .45), lid: C(.4, 30, 1), mouth: C(.85, 20, 1),
         tapAmp: C(0, 8, 1), shake: C(0, 16, 1), wTap: C(0, 16, 1), walk: C(0, 18, 1),
-        phone: C(0, 50, 1), point: C(0, 60, 1), stomp: C(0, 160, .55), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
+        phone: C(0, 50, 1), point: C(0, 60, 1), longF: C(0, 200, 1), stomp: C(0, 160, .55), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
       };
     }
     function set(o) { for (var k in o) ch[k].t = o[k]; }
@@ -470,7 +471,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function rnd(a, b) { return a + Math.random() * (b - a); }
 
-    var REST = { lUp: -2, lFo: 8, rUp: -9, rFo: 6, point: 0, wTap: 0, tilt: 0 };
+    var REST = { lUp: -2, lFo: 8, rUp: -9, rFo: 6, point: 0, longF: 0, wTap: 0, tilt: 0 };
     var LOOK_TAB = { turn: 0, lookX: .9, lookY: -.1 };
     var LOOK_YOU = { turn: 1, lookX: -.1, lookY: 0 };
     var PHONE = { lUp: 12, lFo: 122, turn: .15, lookX: .2, lookY: 1 };
@@ -519,25 +520,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         set(REST); set(LOOK_TAB); await sleep(600);
       },
       pointTab: async function (tok) {
-        set(LOOK_YOU); set({ lUp: 118, lFo: 6, point: 1 }); await sleep(450); if (tok !== abort) return;
+        set(LOOK_YOU); set({ lUp: 118, lFo: 6, point: 1, longF: 1 }); await sleep(450); if (tok !== abort) return;
         ch.wTap.t = .7; await sleep(rnd(1200, 1600)); if (tok !== abort) return;
         ch.wTap.t = 0; set(LOOK_TAB); await sleep(800); if (tok !== abort) return;
         set(LOOK_YOU); await sleep(700); if (tok !== abort) return;
         set(REST); set(LOOK_TAB); await sleep(700);
       },
-      pointClock: async function (tok) {
-        set({ turn: .25, lookX: -.6, lookY: -1, tilt: -3 }); set({ lUp: -140, lFo: -14, point: 1 }); await sleep(500); if (tok !== abort) return;
-        ch.wTap.t = .6; await sleep(rnd(1000, 1400)); if (tok !== abort) return;
-        set(LOOK_YOU); set({ tilt: -3 }); await sleep(rnd(1000, 1400)); if (tok !== abort) return;
-        ch.wTap.t = 0; set(REST); set(LOOK_TAB); await sleep(750);
-      },
       none: function () { return sleep(10); }
     };
     var PLAN = [
       [7000, 12000, [["glance", 5], ["cross", 2], ["none", 3]]],
-      [4000, 7000, [["cross", 4], ["watch", 4], ["glance", 3], ["pointTab", 1], ["pointClock", 1]]],
-      [2500, 4500, [["tapWatch", 3], ["shakeHead", 2], ["stomp", 2], ["pointTab", 2], ["pointClock", 2], ["watch", 1], ["cross", 1], ["glance", 1]]],
-      [1500, 3000, [["tapWatch", 3], ["shakeHead", 3], ["stomp", 3], ["pointTab", 2], ["pointClock", 2], ["glance", 1], ["cross", 1]]]
+      [4000, 7000, [["cross", 4], ["watch", 4], ["glance", 3], ["pointTab", 1]]],
+      [2500, 4500, [["tapWatch", 3], ["shakeHead", 2], ["stomp", 2], ["pointTab", 2], ["watch", 1], ["cross", 1], ["glance", 1]]],
+      [1500, 3000, [["tapWatch", 3], ["shakeHead", 3], ["stomp", 3], ["pointTab", 2], ["glance", 1], ["cross", 1]]]
     ];
     function pick(list) {
       var sum = 0; list.forEach(function (x) { sum += x[1]; });
@@ -578,6 +573,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       else if (!front && el.armR.parentNode !== el.back) el.back.appendChild(el.armR);
       var pt = cl(v("point"), 0, 1);
       el.handL.setAttribute("opacity", pt > .5 ? 0 : 1); el.point.setAttribute("opacity", pt > .5 ? 1 : 0);
+      var lf = v("longF") > .5; el.fl.setAttribute("opacity", lf ? 1 : 0); el.fs.setAttribute("opacity", lf ? 0 : 1);
       el.phone.setAttribute("opacity", cl(v("phone"), 0, 1) > .5 ? 1 : 0);
       var sh = v("shake") * Math.sin(T * 13), p = v("pitch");
       el.head.setAttribute("transform", "translate(" + NECK_X + " " + (NECK_Y + p * 6).toFixed(2) + ") rotate(" + (4 + sh * 4 + v("tilt") + p * 3).toFixed(2) + ")");
