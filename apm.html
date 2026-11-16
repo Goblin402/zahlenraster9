@@ -289,7 +289,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     })();
   }
 
-  /* ---------- Raum: Wanduhr + Wand-Tablet ---------- */
+  /* ---------- Raum: Wanduhr + Wandmonitor ---------- */
   var Scene = (function () {
     var SEG = ["abcdef", "bc", "abged", "abgcd", "fgbc", "afgcd", "afgedc", "abc", "abcdefg", "abcdfg"];
     var on = [];
@@ -310,12 +310,13 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     }
     function build() {
       var s = '<svg id="sc" viewBox="0 80 400 700" preserveAspectRatio="xMidYMax meet" aria-hidden="true"><defs>' +
-        '<filter id="fGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="9"/></filter>' +
+        '<filter id="fGlow" x="-40%" y="-50%" width="180%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>' +
         '<filter id="fSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>' +
         '<filter id="fSeg" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
-        '<linearGradient id="gScr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16191d"/><stop offset="1" stop-color="#0c0e10"/></linearGradient>' +
-        '<clipPath id="k-c0" clipPathUnits="userSpaceOnUse"><ellipse id="k-ce0"/></clipPath>' +
-        '<clipPath id="k-c1" clipPathUnits="userSpaceOnUse"><ellipse id="k-ce1"/></clipPath>' +
+        '<linearGradient id="gScr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#171a1f"/><stop offset="1" stop-color="#0b0d10"/></linearGradient>' +
+        '<linearGradient id="gRef" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".09"/><stop offset=".45" stop-color="#fff" stop-opacity=".02"/><stop offset=".46" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+        '<clipPath id="k-c0" clipPathUnits="userSpaceOnUse"><path id="k-ce0"/></clipPath>' +
+        '<clipPath id="k-c1" clipPathUnits="userSpaceOnUse"><path id="k-ce1"/></clipPath>' +
         '</defs>';
       // Wanduhr
       s += '<rect x="27" y="106" width="176" height="66" rx="10" fill="rgba(60,40,20,.22)" filter="url(#fSoft)"/>';
@@ -327,17 +328,17 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       lits += '<circle class="sgOn" cx="112" cy="125" r="2.9"/><circle class="sgOn" cx="112" cy="141" r="2.9"/>';
       s += offs + '<g filter="url(#fSeg)">' + lits + '</g>';
       s += '<path d="M34,103 L190,103" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/>';
-      // Wand-Tablet
-      s += '<rect id="tabGlow" x="208" y="190" width="184" height="188" rx="24" fill="#5fd17a" opacity=".3" filter="url(#fGlow)"/>';
-      s += '<rect x="217" y="203" width="172" height="176" rx="18" fill="rgba(60,40,20,.25)" filter="url(#fSoft)"/>';
-      s += '<rect x="214" y="196" width="172" height="176" rx="18" fill="#1a1a1c" stroke="#0a0a0b" stroke-width="1.5"/>';
-      s += '<rect x="215.5" y="197.5" width="169" height="173" rx="16.5" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="1"/>';
-      s += '<rect id="tabEdge" x="223" y="205" width="154" height="158" rx="9" fill="url(#gScr)" stroke="#5fd17a" stroke-width="2" stroke-opacity=".5"/>';
-      s += '<circle cx="300" cy="200.5" r="1.6" fill="#3a3a3e"/>';
-      s += '<text id="tabL" x="300" y="229" text-anchor="middle" font-size="8.5" fill="#8d877e">皿 TELLER</text>';
-      s += '<g id="tabNum"><text id="tabN" x="300" y="314" text-anchor="middle" font-size="94" fill="#f3ede2">0</text></g>';
-      s += '<text id="tabD" x="300" y="349" text-anchor="middle" font-size="22" fill="#f3ede2">±0</text>';
-      s += '<path d="M226,208 L250,208" stroke="rgba(255,255,255,.05)" stroke-width="2"/>';
+      // Wandmonitor (Querformat, schmaler Rahmen)
+      var X = 208, Y = 198, W = 186, H = 120;
+      s += '<rect id="tabGlow" x="' + (X - 4) + '" y="' + (Y - 4) + '" width="' + (W + 8) + '" height="' + (H + 8) + '" rx="12" fill="#5fd17a" opacity=".3" filter="url(#fGlow)"/>';
+      s += '<rect x="' + (X + 4) + '" y="' + (Y + 8) + '" width="' + W + '" height="' + H + '" rx="7" fill="rgba(60,40,20,.28)" filter="url(#fSoft)"/>';
+      s += '<rect x="' + X + '" y="' + Y + '" width="' + W + '" height="' + H + '" rx="7" fill="#101012" stroke="#050506" stroke-width="1.2"/>';
+      s += '<rect id="tabEdge" x="' + (X + 5) + '" y="' + (Y + 5) + '" width="' + (W - 10) + '" height="' + (H - 13) + '" rx="2.5" fill="url(#gScr)" stroke="#5fd17a" stroke-width="1.6" stroke-opacity=".5"/>';
+      s += '<rect x="' + (X + 5) + '" y="' + (Y + 5) + '" width="' + (W - 10) + '" height="' + (H - 13) + '" rx="2.5" fill="url(#gRef)"/>';
+      s += '<rect x="' + (X + W / 2 - 9) + '" y="' + (Y + H - 6) + '" width="18" height="2" rx="1" fill="#2a2a2e"/><circle cx="' + (X + W - 12) + '" cy="' + (Y + H - 5) + '" r="1.3" fill="#3fbf6a"/>';
+      s += '<text id="tabL" x="' + (X + 14) + '" y="' + (Y + 20) + '" font-size="8" fill="#8d877e">皿 TELLER</text>';
+      s += '<g id="tabNum"><text id="tabN" x="' + (X + W / 2) + '" y="' + (Y + 84) + '" text-anchor="middle" font-size="70" fill="#f3ede2">0</text></g>';
+      s += '<text id="tabD" x="' + (X + W / 2) + '" y="' + (Y + 106) + '" text-anchor="middle" font-size="17" fill="#f3ede2">±0</text>';
       s += Aki.markup();
       s += '</svg>';
       $("scene").innerHTML = s;
@@ -357,7 +358,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     function tablet(n, d) {
       var c = d >= 0 ? "#62d47e" : "#ff5a48", k = Math.min(1, .35 + .14 * Math.abs(d));
       $("tabN").textContent = n;
-      $("tabN").setAttribute("font-size", n >= 100 ? 74 : 94);
+      $("tabN").setAttribute("font-size", n >= 100 ? 58 : 70);
       var t = $("tabD"); t.textContent = sgn(d); t.setAttribute("fill", d > 0 ? "#7fe39a" : d < 0 ? "#ff7a6a" : "#f3ede2");
       var g = $("tabGlow"); g.setAttribute("fill", c); g.setAttribute("opacity", (k * .7).toFixed(2));
       var e = $("tabEdge"); e.setAttribute("stroke", c); e.setAttribute("stroke-opacity", (.25 + k * .6).toFixed(2));
@@ -366,26 +367,28 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     return { build: build, clock: clock, tablet: tablet, bump: bump, reset: function () { shown = ""; } };
   })();
 
-  /* ---------- Aki: animierte Figur ---------- */
+  /* ---------- Aki: animierte Figur, schräg zum Monitor gedreht ---------- */
   var Aki = (function () {
     var SK = "#f6c9a0", INK = "#151312", SHIRT = "#4a4f58", PANTS = "#474c52";
     var S = 'stroke="' + INK + '" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"';
+    var HOME = 100, NECK_X = 24, NECK_Y = -406;
     var el = {}, ch = {}, alive = false, raf2 = 0, last = 0, T = 0, abort = 0, busy = false, nextAt = 0, lvl = 1;
-    var exiting = false, walking = false, walkDone = null, offX = -300, blinkUntil = 0, nextBlink = 0;
+    var exiting = false, walking = false, walkGoal = 0, walkDir = 1, walkDone = null, blinkUntil = 0, nextBlink = 0, nodTimers = [];
 
+    // Arm: lokal hängt er nach unten, positive Winkel drehen zur Körpermitte
     function arm(side) {
-      var id = side, watch = side === "R";
-      var s = '<g id="k-arm' + id + '">';
+      var watch = side === "R";
+      var s = '<g id="k-arm' + side + '">';
       s += '<path d="M-8,44 L-9,97 Q2,103 12,97 L13,44 Z" fill="' + SK + '"/>';
       s += '<path d="M-8,48 L-9,97 Q2,103 12,97 L13,48" fill="none" ' + S + '/>';
       s += '<path d="M-17,-6 Q6,-15 21,-4 Q31,18 32,52 Q14,60 -11,56 Q-19,28 -17,-6 Z" fill="' + SHIRT + '" ' + S + '/>';
       s += '<path d="M-6,44 Q8,46 22,42" fill="none" stroke="#3a3e46" stroke-width="1.6"/>';
-      s += '<g id="k-fore' + id + '">';
+      s += '<g id="k-fore' + side + '">';
       if (!watch) s += '<g id="k-phone" opacity="0"><rect x="-14" y="66" width="29" height="52" rx="5" fill="#141414" ' + S + '/><rect x="-10" y="71" width="21" height="40" rx="2" fill="#86b8ff"/><rect x="-10" y="71" width="21" height="8" fill="#a8cdff"/></g>';
       s += '<path d="M-10,-6 L-9,64 L11,64 L12,-6 Z" fill="' + SK + '"/>';
       s += '<path d="M-10,-1 L-9,63 M12,-1 L11,63" fill="none" ' + S + '/>';
       if (watch) s += '<rect x="-11.5" y="43" width="25" height="10" rx="2" fill="#2a2a2a" ' + S + '/><circle cx="1" cy="48" r="7" fill="#dfe3e6" ' + S + '/><path d="M1,48 L1,43.5 M1,48 L4.5,49.5" stroke="' + INK + '" stroke-width="1.3" stroke-linecap="round"/>';
-      s += '<g id="k-hand' + id + '"><path d="M-10,60 Q-15,76 -11,90 Q-6,101 4,100 Q14,98 14,86 L13,60 Z" fill="' + SK + '" ' + S + '/>' +
+      s += '<g id="k-hand' + side + '"><path d="M-10,60 Q-15,76 -11,90 Q-6,101 4,100 Q14,98 14,86 L13,60 Z" fill="' + SK + '" ' + S + '/>' +
         '<path d="M-3,80 L-2,95 M3.5,81 L4.5,97" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-linecap="round"/>' +
         '<path d="M-10,66 Q-19,70 -18,80 Q-15,85 -10,80" fill="' + SK + '" ' + S + '/></g>';
       if (!watch) s += '<g id="k-point" opacity="0"><path d="M-3,82 L-3,110 Q0,115 3,110 L3,82 Z" fill="' + SK + '" ' + S + '/>' +
@@ -394,66 +397,69 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     }
     function markup() {
       var s = '<g id="k-man">';
-      s += '<ellipse cx="0" cy="-3" rx="80" ry="9" fill="rgba(70,45,20,.17)"/>';
-      // Beine (Schuh zuerst, Hosenbein darüber)
-      s += '<g id="k-legL"><path d="M-14,-26 Q-46,-30 -62,-17 Q-70,-4 -56,0 L-8,0 Q0,-1 -2,-11 Q-4,-24 -14,-26 Z" fill="#3b2a21" ' + S + '/><path d="M-57,-4 L-7,-4" stroke="#241912" stroke-width="2"/>' +
-        '<path d="M-64,-222 L2,-222 L2,-168 L-6,-27 Q-7,-20 -15,-20 L-50,-20 Q-57,-20 -58,-27 Z" fill="' + PANTS + '" ' + S + '/><path d="M-31,-150 Q-32,-100 -34,-46" fill="none" stroke="#363a40" stroke-width="1.6"/></g>';
-      s += '<g id="k-legR"><g id="k-shoeR"><path d="M14,-26 Q46,-30 62,-17 Q70,-4 56,0 L8,0 Q0,-1 2,-11 Q4,-24 14,-26 Z" fill="#3b2a21" ' + S + '/><path d="M57,-4 L7,-4" stroke="#241912" stroke-width="2"/></g>' +
-        '<path d="M64,-222 L-2,-222 L-2,-168 L6,-27 Q7,-20 15,-20 L50,-20 Q57,-20 58,-27 Z" fill="' + PANTS + '" ' + S + '/><path d="M31,-150 Q32,-100 34,-46" fill="none" stroke="#363a40" stroke-width="1.6"/></g>';
-      // Oberkörper
-      s += '<g id="k-upper">';
-      s += '<path d="M-66,-232 L66,-232 L64,-172 L-64,-172 Z" fill="' + PANTS + '"/><path d="M-66,-232 L-64,-182 M66,-232 L64,-182" fill="none" ' + S + '/><path d="M3,-224 Q6,-196 1,-172" fill="none" stroke="#363a40" stroke-width="1.8"/>';
-      s += '<path d="M-24,-402 Q-52,-397 -69,-383 Q-79,-372 -77,-346 L-71,-262 Q-69,-238 -62,-230 L62,-230 Q69,-238 71,-262 L77,-346 Q79,-372 69,-383 Q52,-397 24,-402 Z" fill="' + SHIRT + '" ' + S + '/>';
-      s += '<path d="M-44,-318 Q-49,-288 -42,-262 M46,-324 Q42,-294 48,-266 M-22,-252 Q0,-246 24,-253" fill="none" stroke="#3a3e46" stroke-width="1.8" stroke-linecap="round"/>';
-      s += '<path d="M-19,-424 L-19,-399 Q0,-390 19,-399 L19,-424 Z" fill="' + SK + '" ' + S + '/>';
-      s += '<path d="M-15,-400 L0,-374 L15,-400 Z" fill="' + SK + '" ' + S + '/>';
-      s += '<path d="M-24,-405 Q-37,-393 -41,-371 L-15,-375 L-1,-389 Z" fill="#50555e" ' + S + '/><path d="M24,-405 Q37,-393 41,-371 L15,-375 L1,-389 Z" fill="#50555e" ' + S + '/>';
-      s += '<path d="M0,-376 L0,-336" stroke="' + INK + '" stroke-width="2"/><circle cx="5" cy="-360" r="2.4" fill="#2e3238" stroke="' + INK + '" stroke-width="1.2"/><circle cx="5" cy="-345" r="2.4" fill="#2e3238" stroke="' + INK + '" stroke-width="1.2"/>';
-      s += '<rect x="-67" y="-246" width="134" height="16" rx="2" fill="#262626" ' + S + '/><path d="M-42,-246 L-42,-230 M-12,-246 L-12,-230 M54,-246 L54,-230" stroke="' + INK + '" stroke-width="1.5"/>';
-      s += '<rect x="14" y="-249" width="28" height="22" rx="3" fill="#626262" ' + S + '/><rect x="20" y="-243" width="16" height="10" rx="1.5" fill="#2b2b2b"/>';
-      // Kopf
+      s += '<ellipse cx="6" cy="-3" rx="74" ry="9" fill="rgba(70,45,20,.17)"/>';
+      // hinteres Bein (sein linkes), Schuh zeigt zum Monitor
+      s += '<g id="k-legR"><path d="M6,-26 Q1,-12 6,-2 L58,0 Q72,-2 70,-12 Q66,-23 44,-26 Z" fill="#33251d" ' + S + '/><path d="M8,-4 L62,-4" stroke="#21170f" stroke-width="2"/>' +
+        '<path d="M-10,-228 L46,-228 L44,-150 L42,-27 Q41,-20 34,-20 L10,-20 Q4,-20 4,-27 L-2,-160 Z" fill="#40454b" ' + S + '/></g>';
+      // vorderes Bein (sein rechtes)
+      s += '<g id="k-legL"><g id="k-shoeL"><path d="M-46,-26 Q-52,-12 -46,-2 L12,0 Q27,-2 25,-12 Q21,-24 -2,-26 Z" fill="#3b2a21" ' + S + '/><path d="M-44,-4 L16,-4" stroke="#241912" stroke-width="2"/></g>' +
+        '<path d="M-56,-228 L8,-228 L4,-160 L-2,-27 Q-3,-20 -10,-20 L-40,-20 Q-46,-20 -47,-27 L-54,-150 Z" fill="' + PANTS + '" ' + S + '/><path d="M-26,-150 Q-25,-100 -24,-46" fill="none" stroke="#363a40" stroke-width="1.6"/></g>';
+      s += '<g id="k-upper"><g id="k-back"></g>';
+      s += '<path d="M-58,-238 L60,-238 Q58,-206 46,-178 L-55,-178 Z" fill="' + PANTS + '"/><path d="M-58,-238 L-55,-186 M60,-238 Q58,-208 48,-186" fill="none" ' + S + '/><path d="M26,-230 Q28,-202 24,-180" fill="none" stroke="#363a40" stroke-width="1.8"/>';
+      // Oberkörper in 3/4-Ansicht mit leicht rundem Rücken
+      s += '<path d="M4,-412 Q-30,-414 -52,-398 Q-76,-380 -75,-340 Q-73,-298 -64,-262 Q-60,-240 -54,-234 L62,-234 Q72,-246 74,-272 Q78,-306 70,-346 Q64,-378 46,-398 Q30,-410 14,-412 Z" fill="' + SHIRT + '" ' + S + '/>';
+      s += '<path d="M-54,-380 Q-64,-360 -66,-336" fill="none" stroke="#3a3e46" stroke-width="2" stroke-linecap="round"/>';
+      s += '<path d="M-38,-322 Q-44,-292 -38,-264 M48,-332 Q44,-302 52,-272 M-12,-254 Q16,-248 42,-256" fill="none" stroke="#3a3e46" stroke-width="1.8" stroke-linecap="round"/>';
+      s += '<path d="M8,-436 L4,-406 Q18,-398 34,-406 L38,-436 Z" fill="' + SK + '" ' + S + '/>';
+      s += '<path d="M10,-410 L25,-384 L38,-410 Z" fill="' + SK + '" ' + S + '/>';
+      s += '<path d="M4,-414 Q-12,-406 -16,-388 L6,-386 L15,-400 Z" fill="#50555e" ' + S + '/><path d="M38,-412 Q50,-400 52,-381 L30,-383 L22,-398 Z" fill="#50555e" ' + S + '/>';
+      s += '<path d="M26,-384 L28,-340" stroke="' + INK + '" stroke-width="2"/><circle cx="32" cy="-366" r="2.4" fill="#2e3238" stroke="' + INK + '" stroke-width="1.2"/><circle cx="33" cy="-351" r="2.4" fill="#2e3238" stroke="' + INK + '" stroke-width="1.2"/>';
+      s += '<path d="M-58,-252 L66,-252 L66,-236 L-58,-236 Z" fill="#262626" ' + S + '/><path d="M-36,-252 L-36,-236 M-6,-252 L-6,-236" stroke="' + INK + '" stroke-width="1.5"/>';
+      s += '<rect x="32" y="-255" width="26" height="22" rx="3" fill="#626262" ' + S + '/><rect x="38" y="-249" width="14" height="10" rx="1.5" fill="#2b2b2b"/>';
+      // Kopf (Drehpunkt am Hals)
       s += '<g id="k-head">';
       s += '<path id="k-earR" d="M58,-102 Q76,-104 76,-85 Q74,-66 58,-62 Z" fill="' + SK + '" ' + S + ' opacity="0"/>';
-      s += '<path d="M-53,-101 Q-72,-105 -73,-85 Q-72,-64 -54,-60 Z" fill="' + SK + '" ' + S + '/>';
-      var FACE = "M-56,-140 L-56,-126 Q-60,-82 -54,-54 Q-46,-27 -26,-13 Q-6,-2 12,-6 Q36,-14 50,-34 Q62,-56 63,-92 L62,-142 Q0,-162 -56,-140 Z";
+      s += '<path id="k-earL" d="M-53,-101 Q-72,-105 -73,-85 Q-72,-64 -54,-60 Z" fill="' + SK + '" ' + S + '/>';
+      var FACE = "M-56,-140 L-56,-126 Q-60,-82 -54,-54 Q-46,-27 -26,-13 Q-6,-1 14,-5 Q38,-13 51,-34 Q62,-56 63,-92 L62,-142 Q0,-162 -56,-140 Z";
       s += '<path d="' + FACE + '" fill="' + SK + '" ' + S + '/>';
       s += '<path id="k-red" d="' + FACE + '" fill="#e2432b" opacity="0"/>';
-      s += '<path d="M-61,-92 Q-67,-89 -65,-77" fill="none" stroke="' + INK + '" stroke-width="1.8" stroke-linecap="round"/>';
-      s += '<path d="M-60,-104 Q-71,-142 -52,-164 Q-24,-190 14,-186 Q52,-182 66,-154 Q75,-134 66,-106 Q62,-124 52,-133 Q40,-129 27,-137 Q4,-131 -16,-139 Q-34,-135 -46,-125 Q-52,-117 -53,-101 Z" fill="#121212" ' + S + '/>';
+      s += '<path id="k-earIn" d="M-61,-92 Q-67,-89 -65,-77" fill="none" stroke="' + INK + '" stroke-width="1.8" stroke-linecap="round"/>';
+      s += '<path d="M-60,-98 Q-78,-146 -54,-176 Q-24,-204 18,-198 Q58,-192 70,-160 Q78,-136 68,-108 Q64,-126 57,-134 Q50,-140 46,-150 Q36,-138 16,-140 Q-14,-146 -36,-136 Q-50,-126 -53,-98 Z" fill="#121212" ' + S + '/>';
       s += '<path d="M-57,-114 L-51,-114 L-51,-92 L-56,-94 Z" fill="#121212"/>';
-      s += '<path d="M-20,-176 Q4,-180 30,-172" fill="none" stroke="#3a3a3a" stroke-width="2" stroke-linecap="round"/>';
+      s += '<path d="M-26,-186 Q4,-192 36,-182" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round"/>';
       for (var i = 0; i < 2; i++) {
-        s += '<ellipse id="k-ew' + i + '" fill="#fff"/>';
-        s += '<g clip-path="url(#k-c' + i + ')"><circle id="k-pu' + i + '" r="3.7" fill="' + INK + '"/><polygon id="k-lid' + i + '" fill="' + SK + '"/><line id="k-ll' + i + '" stroke="' + INK + '" stroke-width="3" stroke-linecap="round"/></g>';
-        s += '<ellipse id="k-eo' + i + '" fill="none" stroke="' + INK + '" stroke-width="2.2"/>';
+        s += '<path id="k-ew' + i + '" fill="#fff"/>';
+        s += '<g clip-path="url(#k-c' + i + ')"><circle id="k-pu' + i + '" r="3.1" fill="' + INK + '"/><polygon id="k-lid' + i + '" fill="' + SK + '"/><line id="k-ll' + i + '" stroke="' + INK + '" stroke-width="3.2" stroke-linecap="round"/></g>';
+        s += '<path id="k-eo' + i + '" fill="none" stroke="' + INK + '" stroke-width="2.2" stroke-linejoin="round"/>';
         s += '<polygon id="k-br' + i + '" fill="' + INK + '" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
         s += '<path id="k-bag' + i + '" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-linecap="round" opacity=".75"/>';
       }
       ["nose", "naso", "mouth", "lip", "chin", "crease", "cheek"].forEach(function (n) {
-        var w = { nose: 2.4, naso: 1.7, mouth: 2.7, lip: 1.8, chin: 1.5, crease: 1.5, cheek: 1.5 }[n];
+        var w = { nose: 2.4, naso: 1.8, mouth: 2.7, lip: 1.8, chin: 1.5, crease: 1.5, cheek: 1.5 }[n];
         s += '<path id="k-' + n + '" fill="none" stroke="' + INK + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"' + (n === "chin" || n === "cheek" ? ' opacity=".7"' : "") + "/>";
       });
       s += '<g id="k-mark" opacity="0"><path d="M-9,-3 Q-4,-4 -3,-9 M3,-9 Q4,-4 9,-3 M9,3 Q4,4 3,9 M-3,9 Q-4,4 -9,3" fill="none" stroke="#e0352b" stroke-width="3.4" stroke-linecap="round"/></g>';
       for (var j = 0; j < 6; j++) s += '<circle id="k-st' + j + '" r="6" fill="#ffffff" stroke="#a9a196" stroke-width="2" opacity="0"/>';
       s += '</g>';
-      s += arm("R") + arm("L");
+      s += '<g id="k-front">' + arm("R") + arm("L") + '</g>';
       s += '</g></g>';
       return s;
     }
     function bind() {
-      ["man", "legL", "legR", "shoeR", "upper", "head", "armL", "foreL", "armR", "foreR", "handL", "point", "phone", "earR", "red",
+      ["man", "legL", "legR", "shoeL", "upper", "back", "front", "head", "armL", "foreL", "armR", "foreR", "handL", "point", "phone", "earR", "earL", "earIn", "red",
        "nose", "naso", "mouth", "lip", "chin", "crease", "cheek", "mark", "ce0", "ce1", "ew0", "ew1", "eo0", "eo1", "pu0", "pu1",
        "lid0", "lid1", "ll0", "ll1", "br0", "br1", "bag0", "bag1", "st0", "st1", "st2", "st3", "st4", "st5"].forEach(function (k) { el[k] = document.getElementById("k-" + k); });
+      el.back.appendChild(el.armR);   // hinterer Arm hängt hinter dem Körper
     }
 
     function C(v, k, z) { return { v: v, t: v, vel: 0, k: k, z: z }; }
     function initCh() {
       ch = {
-        lUp: C(-4, 85, .58), lFo: C(6, 85, .58), rUp: C(-4, 85, .58), rFo: C(6, 85, .58),
-        turn: C(0, 55, .85), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 240, .42),
+        lUp: C(-2, 85, .58), lFo: C(8, 85, .58), rUp: C(-9, 85, .58), rFo: C(6, 85, .58),
+        turn: C(0, 55, .82), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 240, .42),
         anger: C(.85, 14, 1), red: C(0, 4, 1), steam: C(0, 3, 1), mark: C(0, 60, .45), lid: C(.4, 30, 1), mouth: C(.85, 20, 1),
-        tapAmp: C(0, 8, 1), shake: C(0, 16, 1), wTap: C(0, 16, 1), flip: C(1, 110, .55), walk: C(0, 7, 1),
-        phone: C(0, 50, 1), point: C(0, 60, 1), x: C(112, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
+        tapAmp: C(0, 8, 1), shake: C(0, 16, 1), wTap: C(0, 16, 1), walk: C(0, 18, 1),
+        phone: C(0, 50, 1), point: C(0, 60, 1), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
       };
     }
     function set(o) { for (var k in o) ch[k].t = o[k]; }
@@ -463,9 +469,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function rnd(a, b) { return a + Math.random() * (b - a); }
 
-    var REST = { lUp: -4, lFo: 6, rUp: -4, rFo: 6, point: 0, wTap: 0, tilt: 0 };
-    var LOOK_TAB = { turn: 0, lookX: .9, lookY: -.05 };
-    var LOOK_YOU = { turn: 1, lookX: 0, lookY: 0 };
+    var REST = { lUp: -2, lFo: 8, rUp: -9, rFo: 6, point: 0, wTap: 0, tilt: 0 };
+    var LOOK_TAB = { turn: 0, lookX: .9, lookY: -.1 };
+    var LOOK_YOU = { turn: 1, lookX: -.1, lookY: 0 };
+    var PHONE = { lUp: 12, lFo: 122, turn: .15, lookX: .2, lookY: 1 };
     var MOOD = [
       { anger: .3, red: 0, steam: 0, mark: 0, lid: .3, mouth: .35, tapAmp: 0 },
       { anger: .85, red: 0, steam: 0, mark: 0, lid: .4, mouth: .85, tapAmp: 0 },
@@ -476,26 +483,28 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var A = {
       glance: async function (tok) {
         set(LOOK_YOU); set({ tilt: lvl >= 2 ? 3 : 0 }); await sleep(rnd(1500, 2800)); if (tok !== abort) return;
-        set(LOOK_TAB); set({ tilt: 0 }); await sleep(500);
+        set(LOOK_TAB); set({ tilt: 0 }); await sleep(600);
       },
       cross: async function (tok) {
-        set({ lUp: -10, lFo: 98, rUp: -8, rFo: 107 }); await sleep(lvl === 0 ? rnd(4500, 7500) : rnd(3000, 5500)); if (tok !== abort) return;
-        if (lvl > 0 && Math.random() < .5) { set(LOOK_YOU); await sleep(1300); if (tok !== abort) return; set(LOOK_TAB); await sleep(300); if (tok !== abort) return; }
+        set({ lUp: -10, lFo: 126, rUp: -16, rFo: 120 }); await sleep(lvl === 0 ? rnd(4500, 7500) : rnd(3000, 5500)); if (tok !== abort) return;
+        if (lvl > 0 && Math.random() < .55) { set(LOOK_YOU); await sleep(1400); if (tok !== abort) return; set(LOOK_TAB); await sleep(300); if (tok !== abort) return; }
         set(REST); await sleep(650);
       },
       watch: async function (tok) {
-        set({ rUp: -26, rFo: 150, turn: .25, lookX: .3, lookY: 1, tilt: 4 }); await sleep(380); if (tok !== abort) return;
-        ch.pitch.t = .55; await sleep(rnd(1200, 1700)); if (tok !== abort) return;
-        ch.pitch.t = 0; ch.sigh.vel += 7; set(REST); set(LOOK_TAB); await sleep(750);
+        set({ rUp: -26, rFo: 150, turn: .1, lookX: .5, lookY: 1, tilt: 4 }); await sleep(380); if (tok !== abort) return;
+        ch.pitch.t = .55; await sleep(rnd(1000, 1400)); if (tok !== abort) return;
+        // Blick von der Uhr hoch zu dir, Uhr bleibt oben
+        ch.pitch.t = 0; set(LOOK_YOU); set({ tilt: 0 }); await sleep(rnd(1300, 1800)); if (tok !== abort) return;
+        ch.sigh.vel += 7; set(REST); set(LOOK_TAB); await sleep(750);
       },
       tapWatch: async function (tok) {
         set(LOOK_YOU); set({ rUp: -20, rFo: 120 }); await sleep(260); if (tok !== abort) return;
-        set({ lUp: 4, lFo: 96, point: 1 }); await sleep(420); if (tok !== abort) return;
+        set({ lUp: -12, lFo: 108, point: 1 }); await sleep(420); if (tok !== abort) return;
         ch.wTap.t = 1; await sleep(rnd(1700, 2500)); if (tok !== abort) return;
         ch.wTap.t = 0; set(REST); set(LOOK_TAB); await sleep(700);
       },
       shakeHead: async function (tok) {
-        set({ turn: .55, lookX: 0, lookY: .25 }); ch.shake.t = 1; await sleep(rnd(1100, 1700)); if (tok !== abort) return;
+        set({ turn: .7, lookX: -.1, lookY: .25 }); ch.shake.t = 1; await sleep(rnd(1100, 1700)); if (tok !== abort) return;
         ch.shake.t = 0; set(LOOK_TAB); await sleep(500);
       },
       none: function () { return sleep(10); }
@@ -526,58 +535,72 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     function draw(blink) {
       var v = function (k) { return ch[k].v; };
       var foot = v("tapAmp") * Math.max(0, Math.sin(T * (lvl === 3 ? 20 : 14)));
-      var wa = v("walk"), wph = T * 9.5, legA = wa * 18 * Math.sin(wph);
+      var wa = cl(v("walk"), 0, 1.2), wph = T * 10, legA = wa * 20 * Math.sin(wph);
       var bob = -Math.abs(Math.cos(wph)) * 4 * wa + Math.sin(T * 1.7) * 1.1 + v("sigh") * 2;
-      el.man.setAttribute("transform", "translate(" + v("x").toFixed(1) + " 772) scale(" + v("flip").toFixed(3) + " 1)");
-      el.legL.setAttribute("transform", "rotate(" + legA.toFixed(2) + " -30 -214)");
-      el.legR.setAttribute("transform", "rotate(" + (-legA).toFixed(2) + " 30 -214)");
-      el.shoeR.setAttribute("transform", "rotate(" + (-foot * 12).toFixed(2) + " 12 -3)");
+      el.man.setAttribute("transform", "translate(" + v("x").toFixed(1) + " 772)");
+      el.legL.setAttribute("transform", "rotate(" + legA.toFixed(2) + " -22 -214)");
+      el.legR.setAttribute("transform", "rotate(" + (-legA).toFixed(2) + " 20 -214)");
+      el.shoeL.setAttribute("transform", "rotate(" + (-foot * 12).toFixed(2) + " -44 -3)");
       el.upper.setAttribute("transform", "translate(0 " + bob.toFixed(2) + ")");
-      var swing = wa * 13 * Math.sin(wph);
-      el.armL.setAttribute("transform", "translate(-62 -372) scale(-1 1) rotate(" + v("lUp").toFixed(2) + ")");
+      var swing = wa * 14 * Math.sin(wph);
+      el.armL.setAttribute("transform", "translate(-44 -376) scale(-1 1) rotate(" + v("lUp").toFixed(2) + ")");
       el.foreL.setAttribute("transform", "translate(2 95) rotate(" + (v("lFo") + Math.sin(T * 17) * 6 * v("wTap")).toFixed(2) + ")");
-      el.armR.setAttribute("transform", "translate(62 -372) rotate(" + (v("rUp") + swing).toFixed(2) + ")");
-      el.foreR.setAttribute("transform", "translate(2 95) rotate(" + (v("rFo") + swing * .5).toFixed(2) + ")");
+      el.armR.setAttribute("transform", "translate(50 -374) rotate(" + (v("rUp") - swing).toFixed(2) + ")");
+      el.foreR.setAttribute("transform", "translate(2 95) rotate(" + (v("rFo") - swing * .4).toFixed(2) + ")");
+      // hinterer Arm: vor den Körper, sobald er angehoben wird
+      var front = v("rFo") > 55;
+      if (front && el.armR.parentNode !== el.front) el.front.insertBefore(el.armR, el.front.firstChild);
+      else if (!front && el.armR.parentNode !== el.back) el.back.appendChild(el.armR);
       var pt = cl(v("point"), 0, 1);
       el.handL.setAttribute("opacity", pt > .5 ? 0 : 1); el.point.setAttribute("opacity", pt > .5 ? 1 : 0);
-      el.phone.setAttribute("opacity", cl(v("phone"), 0, 1).toFixed(2));
+      el.phone.setAttribute("opacity", cl(v("phone"), 0, 1) > .5 ? 1 : 0);
       var sh = v("shake") * Math.sin(T * 13), p = v("pitch");
-      el.head.setAttribute("transform", "translate(0 " + (-400 + p * 6).toFixed(2) + ") rotate(" + (sh * 4 + v("tilt")).toFixed(2) + ")");
+      el.head.setAttribute("transform", "translate(" + NECK_X + " " + (NECK_Y + p * 6).toFixed(2) + ") rotate(" + (4 + sh * 4 + v("tilt") + p * 3).toFixed(2) + ")");
       face(blink, sh, p);
+    }
+    function eyePath(ex, ey, rx, ht, hb) {
+      return P(["M", ex - rx, ey + 1.5, "C", ex - rx * .55, ey - ht * 1.3, ex + rx * .5, ey - ht * 1.3, ex + rx, ey - 1,
+        "C", ex + rx * .55, ey + hb * 1.25, ex - rx * .5, ey + hb * 1.25, ex - rx, ey + 1.5, "Z"]);
     }
     function face(blink, sh, p) {
       var turn = ch.turn.v, a = ch.anger.v, m = ch.mouth.v;
-      var dx = 7 * (1 - turn) + sh * 8, dy = p * 10;
-      var lid = blink ? 1.08 : Math.min(1, ch.lid.v + Math.max(0, p) * .3);
+      var dx = 11 * (1 - turn) + sh * 8, dy = p * 10;
+      var lid = blink ? 1.1 : Math.min(1, ch.lid.v + Math.max(0, p) * .3);
       var lx = cl(ch.lookX.v, -1, 1), ly = cl(ch.lookY.v, -1, 1);
       for (var i = 0; i < 2; i++) {
-        var ry = 9.5, rx = 14 * (i ? 1 - .1 * (1 - turn) : 1);
-        var ex = (i ? 21 : -23) + dx * (i ? 1.15 : .9), ey = -86 + dy;
-        var E = { cx: ex, cy: ey, rx: rx, ry: ry };
-        attrs(el["ce" + i], E); attrs(el["ew" + i], E); attrs(el["eo" + i], E);
-        attrs(el["pu" + i], { cx: ex + lx * 7, cy: ey + ly * 4.5 + 1 });
-        var base = ey - ry + 2 * ry * lid, inn = base + a * 3.2, out = base - a * 1.8;
-        var yL = i ? inn : out, yR = i ? out : inn, top = ey - ry - 4, x1 = ex - rx - 4, x2 = ex + rx + 4;
-        el["lid" + i].setAttribute("points", P([x1, top, x2, top, x2, yR, x1, yL]));
+        var rx = i ? 16.5 * (1 - .15 * (1 - turn)) : 18, ht = 8.5, hb = 6;
+        var ex = (i ? 26 : -25) + dx * (i ? 1.1 : .8), ey = -85 + dy;
+        var d = eyePath(ex, ey, rx, ht, hb);
+        el["ce" + i].setAttribute("d", d); el["ew" + i].setAttribute("d", d); el["eo" + i].setAttribute("d", d);
+        attrs(el["pu" + i], { cx: ex + lx * (rx - 5), cy: ey + ly * 3.2 + .5 });
+        var topE = ey - ht, base = topE + (ht + hb) * lid, inn = base + a * 3, out = base - a * 1.6;
+        var yL = i ? inn : out, yR = i ? out : inn, x1 = ex - rx - 4, x2 = ex + rx + 4;
+        el["lid" + i].setAttribute("points", P([x1, topE - 6, x2, topE - 6, x2, yR, x1, yL]));
         attrs(el["ll" + i], { x1: x1, y1: yL, x2: x2, y2: yR });
-        var xi = i ? ex - rx + 1 : ex + rx - 1, xo = i ? ex + rx + 5 : ex - rx - 5;
-        var yi = ey - 12 + a * 5.5, yo = ey - 19 - a * 1.2;
-        el["br" + i].setAttribute("points", P([xo, yo - 2.2, xi, yi - 4.2, xi, yi + 3, xo, yo + 2.2]));
-        el["bag" + i].setAttribute("d", P(["M", ex - rx + 3, ey + ry + 3.5, "Q", ex, ey + ry + 8, ex + rx - 3, ey + ry + 3.5]));
+        // Augenbrauen: dick, nach innen tief gezogen
+        var xi = i ? ex - rx + 1 : ex + rx - 1, xo = i ? ex + rx + 4 : ex - rx - 4, xm = (xi + xo) / 2;
+        var yi = ey - 12 + a * 6, yo = ey - 19 - a * 1.5, ym = (yi + yo) / 2 - 1;
+        el["br" + i].setAttribute("points", P([xo, yo - 3, xm, ym - 5, xi, yi - 5.6, xi, yi + 4.4, xm, ym + 3.6, xo, yo + 3]));
+        el["bag" + i].setAttribute("d", P(["M", ex - rx + 3, ey + hb + 4.5, "Q", ex, ey + hb + 9, ex + rx - 2, ey + hb + 4, "M", ex - rx + 7, ey + hb + 9.5, "Q", ex + 1, ey + hb + 12, ex + rx - 6, ey + hb + 9]));
       }
-      var nx = dx * 1.35;
-      el.nose.setAttribute("d", P(["M", 4 + nx, -78 + dy, "C", 7 + nx, -66 + dy, 17 + nx, -58 + dy, 15 + nx, -50 + dy, "C", 13 + nx, -44 + dy, 3 + nx, -44 + dy, -1 + nx, -48 + dy,
-        "M", -9 + nx, -50 + dy, "Q", -5 + nx, -45 + dy, -1 + nx, -48 + dy]));
-      el.naso.setAttribute("d", P(["M", -12 + dx, -57 + dy, "Q", -24 + dx, -45 + dy, -22 + dx, -28 + dy, "M", 22 + dx, -55 + dy, "Q", 31 + dx, -43 + dy, 26 + dx, -28 + dy]));
-      var cy0 = -27 + dy + m * 2.5, my = -30 + dy - m * 3.5;
-      el.mouth.setAttribute("d", P(["M", -17 + dx, cy0, "Q", dx, my, 17 + dx, cy0 - .5]));
-      el.lip.setAttribute("d", P(["M", -6 + dx, -20 + dy + m, "Q", dx, -17.5 + dy + m, 6 + dx, -20 + dy + m]));
-      el.chin.setAttribute("d", P(["M", -9 + dx * .8, -10 + dy * .4, "Q", dx * .8, -7 + dy * .4, 8 + dx * .8, -10 + dy * .4]));
-      el.crease.setAttribute("d", P(["M", -4 + dx, -113 + dy, "Q", -2 + dx, -105 + dy, -4 + dx, -99 + dy, "M", 5 + dx, -113 + dy, "Q", 7 + dx, -105 + dy, 5 + dx, -99 + dy]));
-      el.crease.setAttribute("opacity", cl((a - .5) * 1.6, 0, 1).toFixed(2));
-      el.cheek.setAttribute("d", P(["M", -42 + dx * .5, -66, "Q", -40 + dx * .5, -50, -32 + dx * .5, -38, "M", 47 + dx * .5, -66, "Q", 46 + dx * .5, -52, 40 + dx * .5, -42]));
+      // Nase: kräftig, rechte Kontur mit runder Spitze und Nasenflügeln
+      var nx = dx * 1.4;
+      el.nose.setAttribute("d", P(["M", 5 + nx, -80 + dy, "C", 7 + nx, -68 + dy, 14 + nx, -61 + dy, 17 + nx, -55 + dy,
+        "C", 21 + nx, -48 + dy, 16 + nx, -42 + dy, 9 + nx, -43 + dy, "Q", 5 + nx, -43 + dy, 3 + nx, -46 + dy,
+        "M", -7 + nx, -52 + dy, "Q", -11 + nx, -46 + dy, -5 + nx, -43 + dy, "Q", -1 + nx, -42 + dy, 3 + nx, -46 + dy]));
+      el.naso.setAttribute("d", P(["M", -13 + dx, -55 + dy, "Q", -25 + dx, -44 + dy, -23 + dx, -27 + dy, "M", 24 + dx, -53 + dy, "Q", 32 + dx, -42 + dy, 27 + dx, -27 + dy]));
+      var cy0 = -27 + dy + m * 2.5, my = -31 + dy - m * 2.5;
+      el.mouth.setAttribute("d", P(["M", -19 + dx, cy0, "Q", -4 + dx, my, 10 + dx, -30 + dy - m, "Q", 17 + dx, -29.5 + dy - m * .5, 19 + dx, -24 + dy + m * 1.5]));
+      el.lip.setAttribute("d", P(["M", -10 + dx, -21 + dy + m, "Q", 2 + dx, -16 + dy + m, 13 + dx, -21.5 + dy + m]));
+      el.chin.setAttribute("d", P(["M", -8 + dx * .8, -10 + dy * .4, "Q", 1 + dx * .8, -7 + dy * .4, 9 + dx * .8, -10 + dy * .4]));
+      el.crease.setAttribute("d", P(["M", -3 + dx, -114 + dy, "Q", -1 + dx, -106 + dy, -3 + dx, -100 + dy, "M", 6 + dx, -114 + dy, "Q", 8 + dx, -106 + dy, 6 + dx, -100 + dy]));
+      el.crease.setAttribute("opacity", cl((a - .4) * 1.4, 0, 1).toFixed(2));
+      el.cheek.setAttribute("d", P(["M", -42 + dx * .5, -66, "Q", -40 + dx * .5, -50, -32 + dx * .5, -38, "M", 48 + dx * .5, -66, "Q", 47 + dx * .5, -52, 41 + dx * .5, -42]));
       el.red.setAttribute("opacity", (cl(ch.red.v, 0, 1) * .5).toFixed(3));
-      el.earR.setAttribute("opacity", cl(turn * 1.3 - .3, 0, 1).toFixed(2));
+      // Ohren: zum Monitor gedreht sieht man nur das rechte Ohr (Bildseite links), frontal beide
+      el.earR.setAttribute("opacity", cl(turn * 1.4 - .3, 0, 1).toFixed(2));
+      var eo = (1 - turn) * 3;
+      el.earL.setAttribute("transform", "translate(" + (-eo).toFixed(1) + " 0)"); el.earIn.setAttribute("transform", "translate(" + (-eo).toFixed(1) + " 0)");
       var mk = cl(ch.mark.v, 0, 1.3);
       el.mark.setAttribute("opacity", mk > .03 ? 1 : 0);
       el.mark.setAttribute("transform", "translate(" + (46 + dx * .6).toFixed(1) + " -150) scale(" + (mk * (1 + .16 * Math.sin(T * 10))).toFixed(3) + ")");
@@ -593,46 +616,81 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       var dt = Math.min(.034, Math.max(.001, (now - last) / 1000)); last = now; T += dt;
       schedule(now);
       if (walking) {
-        var spd = 160 * Math.min(1, ch.walk.v + .25);
-        ch.x.v -= spd * dt; ch.x.t = ch.x.v; ch.x.vel = 0;
-        if (ch.x.v < offX) { walking = false; if (walkDone) walkDone(); }
+        var spd = 165 * cl(ch.walk.v + .2, 0, 1);
+        ch.x.v += walkDir * spd * dt; ch.x.t = ch.x.v; ch.x.vel = 0;
+        if ((walkDir > 0 && ch.x.v >= walkGoal) || (walkDir < 0 && ch.x.v <= walkGoal)) {
+          walking = false; ch.x.v = ch.x.t = walkGoal; var f = walkDone; walkDone = null; if (f) f();
+        }
       }
       step(dt);
       if (now > nextBlink) { blinkUntil = now + 130; nextBlink = now + rnd(2200, 5200); }
       draw(now < blinkUntil);
       raf2 = requestAnimationFrame(frame);
     }
+    function edgeX(right) {
+      // Szenen-x knapp außerhalb des sichtbaren Bildschirmrands
+      try { var m = document.getElementById("sc").getScreenCTM(); return right ? (innerWidth - m.e) / m.a + 110 : -m.e / m.a - 120; }
+      catch (e) { return right ? 560 : -160; }
+    }
+    function walkTo(x) {
+      walkGoal = x; walkDir = x > ch.x.v ? 1 : -1; ch.walk.t = 1; walking = true;
+      return new Promise(function (r) { walkDone = r; });
+    }
+    function clearNods() { nodTimers.forEach(clearTimeout); nodTimers = []; }
     function reset() {
-      abort++; busy = false; exiting = false; walking = false;
+      abort++; busy = false; exiting = false; walking = false; walkDone = null; clearNods();
       initCh(); lvl = 1; set(MOOD[1]); for (var k in ch) ch[k].v = ch[k].t;
       var now = performance.now();
       nextAt = now + 1800; T = 0; last = now; nextBlink = now + 1500;
       if (!alive) { alive = true; raf2 = requestAnimationFrame(frame); }
+      draw(false);
+    }
+    // Auftritt: kommt aufs Handy schauend von links rein, steckt es weg, schaut zum Monitor
+    function enter() {
+      var tok = ++abort; busy = true;
+      ch.x.v = ch.x.t = edgeX(false);
+      set(PHONE); ch.phone.v = ch.phone.t = 1; ch.pitch.t = .9;
+      for (var k in PHONE) ch[k].v = PHONE[k];
+      ch.pitch.v = .9;
+      (async function () {
+        await walkTo(HOME); if (tok !== abort) return;
+        ch.walk.t = 0; await sleep(500); if (tok !== abort) return;
+        set({ lUp: -14, lFo: -4, lookY: .6 }); await sleep(420); if (tok !== abort) return;
+        ch.phone.t = 0; ch.phone.v = 0; ch.pitch.t = 0;
+        set(REST); set(LOOK_TAB); await sleep(700); if (tok !== abort) return;
+        busy = false; nextAt = performance.now() + rnd(2500, 4000);
+      })();
     }
     function mood(l) {
       if (exiting || l === lvl) return;
       var up = l > lvl; lvl = l; set(MOOD[l]);
       if (up) nextAt = Math.min(nextAt, performance.now() + 500);
     }
-    function nod() { if (!exiting) ch.pitch.vel += 10; }
+    // Nicken erst nach 0,67 s: er muss den Teller erst wahrnehmen
+    function nod() {
+      var t = setTimeout(function () {
+        nodTimers.splice(nodTimers.indexOf(t), 1);
+        if (alive && !exiting) ch.pitch.vel += 10;
+      }, 670);
+      nodTimers.push(t);
+    }
+    // Abgang: Handy raus, draufschauen, nach rechts aus dem Bild laufen (ohne Spiegeln)
     function exit(done) {
-      abort++; exiting = true; busy = true;
+      var tok = ++abort; exiting = true; busy = true; walking = false; walkDone = null; clearNods();
       set({ wTap: 0, shake: 0, point: 0, tapAmp: 0, tilt: 0 });
       (async function () {
-        set(REST); set({ turn: .5, lookX: 0, lookY: .4 }); ch.pitch.t = 0; await sleep(450);
-        set({ lUp: -16, lFo: -4 }); await sleep(430);
+        set(REST); set({ turn: .4, lookX: 0, lookY: .4 }); ch.pitch.t = 0; await sleep(450);
+        set({ lUp: -14, lFo: -4 }); await sleep(430);
         ch.phone.t = 1; ch.phone.v = 1;
-        set({ lUp: 12, lFo: 122, turn: .35, lookX: -.35, lookY: 1 }); ch.pitch.t = .9; await sleep(1250);
-        ch.flip.t = -1; await sleep(380);
-        try { var m = document.getElementById("sc").getScreenCTM(); offX = (-m.e / m.a) - 120; } catch (e) { offX = -300; }
-        ch.walk.t = 1; walking = true;
-        await new Promise(function (r) { walkDone = r; });
+        set(PHONE); ch.pitch.t = .9; await sleep(1250);
+        await walkTo(edgeX(true));
         await sleep(150);
-        stop(); done();
+        if (tok === abort) { stop(); done(); }
       })();
     }
-    function stop() { alive = false; cancelAnimationFrame(raf2); }
-    return { markup: markup, bind: bind, reset: reset, mood: mood, nod: nod, exit: exit, stop: stop };
+    function stop() { alive = false; cancelAnimationFrame(raf2); clearNods(); }
+    function act(n) { var tok = ++abort; busy = true; A[n](tok).then(function () { if (tok === abort) { busy = false; nextAt = performance.now() + 4000; } }); }
+    return { markup: markup, bind: bind, reset: reset, enter: enter, mood: mood, nod: nod, exit: exit, stop: stop, act: act };
   })();
   Scene.build();
 
@@ -642,11 +700,12 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   function startRun() {
     run = { start: Date.now(), target: target, taps: [] };
     save();
-    setTimeout(enterRun, 450);
+    setTimeout(function () { enterRun(true); }, 450);
   }
-  function enterRun() {
+  function enterRun(fresh) {
     show("run"); wake();
     lastN = -1; lastD = null; Scene.reset(); Aki.reset();
+    if (fresh) Aki.enter();
     cancelAnimationFrame(raf); loop();
   }
   // Stimmung: ab +2 neutral, −1 bis +1 grimmig, −2 bis −4 wütend, ab −5 sehr wütend
