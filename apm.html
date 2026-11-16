@@ -319,7 +319,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         '<clipPath id="k-c1" clipPathUnits="userSpaceOnUse"><path id="k-ce1"/></clipPath>' +
         '</defs>';
       // Wanduhr
-      s += '<rect x="27" y="106" width="176" height="66" rx="10" fill="rgba(60,40,20,.22)" filter="url(#fSoft)"/>';
+      s += '<g id="clk"><rect x="27" y="106" width="176" height="66" rx="10" fill="rgba(60,40,20,.22)" filter="url(#fSoft)"/>';
       s += '<rect x="24" y="100" width="176" height="66" rx="10" fill="#0b0b0b" stroke="#2c2c2c" stroke-width="1.5"/>';
       s += '<rect x="30" y="106" width="164" height="54" rx="6" fill="#050505"/>';
       var xs = [48, 80, 120, 152], offs = "", lits = "";
@@ -327,7 +327,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       offs += '<circle class="sgOff" cx="112" cy="125" r="2.9"/><circle class="sgOff" cx="112" cy="141" r="2.9"/>';
       lits += '<circle class="sgOn" cx="112" cy="125" r="2.9"/><circle class="sgOn" cx="112" cy="141" r="2.9"/>';
       s += offs + '<g filter="url(#fSeg)">' + lits + '</g>';
-      s += '<path d="M34,103 L190,103" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/>';
+      s += '<path d="M34,103 L190,103" stroke="rgba(255,255,255,.08)" stroke-width="1.5"/></g>';
       // Wandmonitor (Querformat, schmaler Rahmen)
       var X = 208, Y = 198, W = 186, H = 120;
       s += '<rect id="tabGlow" x="' + (X - 4) + '" y="' + (Y - 4) + '" width="' + (W + 8) + '" height="' + (H + 8) + '" rx="12" fill="#5fd17a" opacity=".3" filter="url(#fGlow)"/>';
@@ -906,10 +906,27 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     $("run").appendChild(r); setTimeout(function () { r.remove(); }, 480);
   }
   var toastT;
+  function toast(msg, ms) {
+    var t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("on"); }, ms || 900);
+  }
   function undo() {
     if (!run || !run.taps.length) return;
     run.taps.pop(); save();
-    var t = $("toast"); t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("on"); }, 900);
+    toast("−1 rückgängig");
+  }
+  // Tipp auf die Wanduhr ruft den Sohn (Cooldown 20 s); zählt keinen Teller
+  var CLOCK_CD = 20000, clockAt = -1e9;
+  function onClock(x, y) {
+    var r = document.getElementById("clk").getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }
+  function callSon() {
+    if (!run) return;
+    var wait = CLOCK_CD - (Date.now() - clockAt);
+    if (Son.busy()) { toast("Er ist schon da", 1200); return; }
+    if (wait > 0) { toast("Noch " + Math.ceil(wait / 1000) + " s", 1200); return; }
+    clockAt = Date.now();
+    Son.visit(function () { return lastD; }, function () { sonAt = Date.now() + sonGap(); });
   }
   // Gesten: kurzer Tipp oder nach oben wischen = +1, nach unten wischen = −1. Mehrere Finger gleichzeitig zählen einzeln.
   var ptrs = {};
@@ -917,6 +934,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   // Auswertung einer Geste: hoch (ab 25 px) = +1, runter (ab 45 px) = −1, kaum bewegt = Tipp = +1
   function gesture(p, x, y) {
     var dx = x - p.x, dy = y - p.y;
+    if (Math.hypot(dx, dy) < 30 && onClock(p.x, p.y)) { callSon(); return; }
     if (dy > 45 && Math.abs(dx) < dy) undo();
     else if (dy < -25 && Math.abs(dx) < -dy * 1.5) addTap(x, y);
     else if (Math.hypot(dx, dy) < 30) addTap(x, y);
