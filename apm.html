@@ -373,7 +373,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var S = 'stroke="' + INK + '" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"';
     var HOME = 100, NECK_X = 24, NECK_Y = -413;
     var el = {}, ch = {}, alive = false, raf2 = 0, last = 0, T = 0, abort = 0, busy = false, nextAt = 0, lvl = 1;
-    var exiting = false, walking = false, walkGoal = 0, walkDir = 1, walkDone = null, blinkUntil = 0, nextBlink = 0, nodTimers = [];
+    var exiting = false, walking = false, walkGoal = 0, walkDir = 1, walkDone = null, blinkUntil = 0, nextBlink = 0, nodPending = null, nodBusy = false, nodTok = 0;
 
     // Arm: lokal hängt er nach unten, positive Winkel drehen zur Körpermitte
     function arm(side) {
@@ -461,7 +461,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         turn: C(0, 55, .82), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 95, .5),
         anger: C(.85, 14, 1), red: C(0, 4, 1), steam: C(0, 3, 1), mark: C(0, 60, .45), lid: C(.4, 30, 1), mouth: C(.85, 20, 1),
         tapAmp: C(0, 8, 1), shake: C(0, 16, 1), wTap: C(0, 16, 1), walk: C(0, 18, 1),
-        phone: C(0, 50, 1), point: C(0, 60, 1), longF: C(0, 200, 1), stomp: C(0, 160, .55), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
+        phone: C(0, 50, 1), point: C(0, 60, 1), longF: C(0, 200, 1), stomp: C(0, 160, .55), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7), nodP: C(0, 95, .62)
       };
     }
     function set(o) { for (var k in o) ch[k].t = o[k]; }
@@ -575,7 +575,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       el.handL.setAttribute("opacity", pt > .5 ? 0 : 1); el.point.setAttribute("opacity", pt > .5 ? 1 : 0);
       var lf = v("longF") > .5; el.fl.setAttribute("opacity", lf ? 1 : 0); el.fs.setAttribute("opacity", lf ? 0 : 1);
       el.phone.setAttribute("opacity", cl(v("phone"), 0, 1) > .5 ? 1 : 0);
-      var sh = v("shake") * Math.sin(T * 13), p = v("pitch");
+      var sh = v("shake") * Math.sin(T * 13), p = v("pitch") + v("nodP");
       el.head.setAttribute("transform", "translate(" + NECK_X + " " + (NECK_Y + p * 6).toFixed(2) + ") rotate(" + (4 + sh * 4 + v("tilt") + p * 3).toFixed(2) + ")");
       face(blink, sh, p);
     }
@@ -659,7 +659,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       walkGoal = x; walkDir = x > ch.x.v ? 1 : -1; ch.walk.t = 1; walking = true;
       return new Promise(function (r) { walkDone = r; });
     }
-    function clearNods() { nodTimers.forEach(clearTimeout); nodTimers = []; }
+    function clearNods() { clearTimeout(nodPending); nodPending = null; nodBusy = false; nodTok++; if (ch.nodP) { ch.nodP.t = 0; ch.nodP.k = 95; } }
     function reset() {
       abort++; busy = false; exiting = false; walking = false; walkDone = null; clearNods();
       initCh(); lvl = 1; set(MOOD[1]); for (var k in ch) ch[k].v = ch[k].t;
@@ -689,13 +689,30 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       var up = l > lvl; lvl = l; set(MOOD[l]);
       if (up) nextAt = Math.min(nextAt, performance.now() + 500);
     }
-    // Nicken erst nach 0,67 s: er muss den Teller erst wahrnehmen
+    // Nicken: 0,67 s nach dem letzten Tipp. Jeder neue Tipp setzt die Wartezeit zurück,
+    // solange er noch nicht nickt. Während er nickt, lösen weitere Tipps kein zweites Nicken aus.
+    var NODS = [
+      ["normal", 5, [[.42, 230], [0, 380]]],
+      ["doppelt", 2, [[.34, 170], [0, 170], [.34, 170], [0, 380]]],
+      ["halten", 2, [[.5, 650], [0, 450]]],
+      ["langsam", 1, [[.46, 750], [0, 800]], 26]
+    ];
     function nod() {
-      var t = setTimeout(function () {
-        nodTimers.splice(nodTimers.indexOf(t), 1);
-        if (alive && !exiting) ch.pitch.vel += 6.4;
-      }, 670);
-      nodTimers.push(t);
+      if (nodBusy || exiting || !alive) return;
+      clearTimeout(nodPending);
+      nodPending = setTimeout(playNod, 670);
+    }
+    async function playNod() {
+      nodPending = null; if (!alive || exiting) return;
+      var sum = 0, r; NODS.forEach(function (n) { sum += n[1]; }); r = Math.random() * sum;
+      var n = NODS[0]; for (var i = 0; i < NODS.length; i++) { r -= NODS[i][1]; if (r <= 0) { n = NODS[i]; break; } }
+      var tok = ++nodTok; nodBusy = true;
+      ch.nodP.k = n[3] || 95;
+      for (var j = 0; j < n[2].length; j++) {
+        ch.nodP.t = n[2][j][0]; await sleep(n[2][j][1]);
+        if (tok !== nodTok) return;
+      }
+      ch.nodP.k = 95; nodBusy = false;
     }
     // Abgang: Handy raus, draufschauen, nach rechts aus dem Bild laufen (ohne Spiegeln)
     function exit(done) {
