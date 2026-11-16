@@ -104,6 +104,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .sgOff{fill:#2a100b}.sgOn{fill:#ff5634}
 #tabN,#tabD{font-family:var(--mincho);font-weight:600;font-variant-numeric:tabular-nums lining-nums}
 #tabL{font-family:var(--sans);font-weight:600;letter-spacing:.22em}
+#sc.hid #k-man,#sc.hid #s-kid{visibility:hidden}
 #tabNum{transform-box:fill-box;transform-origin:center}
 #tabNum.bump{animation:tb .26s ease-out}
 @keyframes tb{0%{transform:scale(1)}35%{transform:scale(1.09)}100%{transform:scale(1)}}
@@ -400,7 +401,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       var s = '<g id="k-man">';
       s += '<ellipse cx="4" cy="-3" rx="64" ry="9" fill="rgba(70,45,20,.17)"/>';
       // hinteres Bein (sein linkes), Schuh zeigt zum Monitor
-      s += '<g id="k-legR"><path d="M4,-26 Q-1,-12 4,-2 L52,0 Q66,-2 64,-12 Q60,-23 40,-26 Z" fill="#33251d" ' + S + '/><path d="M6,-4 L56,-4" stroke="#21170f" stroke-width="2"/>' +
+      s += '<g id="k-legR"><path id="k-shoeRp" d="M4,-26 Q-1,-12 4,-2 L52,0 Q66,-2 64,-12 Q60,-23 40,-26 Z" fill="#33251d" ' + S + '/><path d="M6,-4 L56,-4" stroke="#21170f" stroke-width="2"/>' +
         '<path d="M-6,-228 L40,-228 L38,-150 L36,-27 Q35,-20 28,-20 L8,-20 Q2,-20 2,-27 L-2,-160 Z" fill="#40454b" ' + S + '/></g>';
       // vorderes Bein (sein rechtes)
       s += '<g id="k-legL"><g id="k-shoeL"><path d="M-42,-26 Q-48,-12 -42,-2 L12,0 Q26,-2 24,-12 Q20,-24 -2,-26 Z" fill="#3b2a21" ' + S + '/><path d="M-40,-4 L14,-4" stroke="#241912" stroke-width="2"/></g>' +
@@ -906,7 +907,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   }
   function enterRun(fresh) {
     show("run"); wake();
-    lastN = -1; lastD = null; Scene.reset(); Aki.reset(); Son.stop(); sonAt = Date.now() + sonGap();
+    lastN = -1; lastD = null; Scene.reset(); Aki.reset(); Son.stop(); setHidden(false); sonAt = Date.now() + sonGap();
     if (fresh) Aki.enter();
     cancelAnimationFrame(raf); loop();
   }
@@ -920,7 +921,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var n = run.taps.length, d = n - Math.round(soll(el, run.target));
     if (n !== lastN || d !== lastD) { lastN = n; lastD = d; Scene.tablet(n, d); }
     Aki.mood(level(d));
-    if (!Son.busy() && Date.now() >= sonAt && el > 8000 && el < DUR - 25000) {
+    if (!hidden && !Son.busy() && Date.now() >= sonAt && el > 8000 && el < DUR - 25000) {
       Son.visit(function () { return lastD; }, function () { sonAt = Date.now() + sonGap(); });
     }
     raf = requestAnimationFrame(loop);
@@ -947,8 +948,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var r = document.getElementById("clk").getBoundingClientRect();
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   }
+  // Tipp auf Akis Schuhe: Aki und Kind komplett unsichtbar, bis die Wanduhr angetippt wird
+  var hidden = false;
+  function setHidden(h) { hidden = h; var sc = document.getElementById("sc"); if (sc) sc.classList.toggle("hid", h); }
+  function onShoes(x, y) {
+    if (hidden) return false;
+    return ["k-shoeL", "k-shoeRp"].some(function (id) {
+      var r = document.getElementById(id).getBoundingClientRect(), p = 8;
+      return x >= r.left - p && x <= r.right + p && y >= r.top - p && y <= r.bottom + p;
+    });
+  }
   function callSon() {
     if (!run) return;
+    if (hidden) { setHidden(false); sonAt = Date.now() + sonGap(); return; }
     var wait = CLOCK_CD - (Date.now() - clockAt);
     if (Son.busy()) { toast("Er ist schon da", 1200); return; }
     if (wait > 0) { toast("Noch " + Math.ceil(wait / 1000) + " s", 1200); return; }
@@ -962,6 +974,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   function gesture(p, x, y) {
     var dx = x - p.x, dy = y - p.y;
     if (Math.hypot(dx, dy) < 30 && onClock(p.x, p.y)) { callSon(); return; }
+    if (Math.hypot(dx, dy) < 30 && run && onShoes(p.x, p.y)) { setHidden(true); return; }
     if (dy > 45 && Math.abs(dx) < dy) undo();
     else if (dy < -25 && Math.abs(dx) < -dy * 1.5) addTap(x, y);
     else if (Math.hypot(dx, dy) < 30) addTap(x, y);
@@ -996,7 +1009,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     LS.set("apm-history", h); LS.del("apm-run");
     run = null; unwake();
     var rec = entry.taps.length > prevBest && entry.taps.length > 0;
-    if (instant) { Aki.stop(); Son.stop(); showResult(entry, rec); return; }
+    if (instant || hidden) { Aki.stop(); Son.stop(); showResult(entry, rec); return; }
     Son.leave();
     Aki.exit(function () { Son.stop(); showResult(entry, rec); });
   }
