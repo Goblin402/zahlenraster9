@@ -371,7 +371,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   var Aki = (function () {
     var SK = "#f6c9a0", INK = "#151312", SHIRT = "#5e1a26", PANTS = "#474c52";
     var S = 'stroke="' + INK + '" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"';
-    var HOME = 100, NECK_X = 24, NECK_Y = -406;
+    var HOME = 100, NECK_X = 24, NECK_Y = -413;
     var el = {}, ch = {}, alive = false, raf2 = 0, last = 0, T = 0, abort = 0, busy = false, nextAt = 0, lvl = 1;
     var exiting = false, walking = false, walkGoal = 0, walkDir = 1, walkDone = null, blinkUntil = 0, nextBlink = 0, nodTimers = [];
 
@@ -391,7 +391,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       s += '<g id="k-hand' + side + '"><path d="M-10,60 Q-15,76 -11,90 Q-6,101 4,100 Q14,98 14,86 L13,60 Z" fill="' + SK + '" ' + S + '/>' +
         '<path d="M-3,80 L-2,95 M3.5,81 L4.5,97" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-linecap="round"/>' +
         '<path d="M-10,66 Q-19,70 -18,80 Q-15,85 -10,80" fill="' + SK + '" ' + S + '/></g>';
-      if (!watch) s += '<g id="k-point" opacity="0"><path d="M-3,82 L-3,110 Q0,115 3,110 L3,82 Z" fill="' + SK + '" ' + S + '/>' +
+      if (!watch) s += '<g id="k-point" opacity="0"><path d="M-3,82 L-3,96 Q0,100 3,96 L3,82 Z" fill="' + SK + '" ' + S + '/>' +
         '<path d="M-10,60 Q-14,74 -9,86 L10,86 Q14,74 13,60 Z" fill="' + SK + '" ' + S + '/><path d="M-6,72 L9,72 M-6,79 L9,79" stroke="' + INK + '" stroke-width="1.4"/></g>';
       return s + '</g></g>';
     }
@@ -410,7 +410,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       s += '<path d="M4,-412 Q-26,-414 -46,-398 Q-65,-382 -63,-344 Q-61,-300 -55,-262 Q-52,-242 -48,-236 L50,-236 Q55,-248 56,-272 Q58,-306 57,-346 Q55,-378 42,-398 Q28,-410 14,-412 Z" fill="' + SHIRT + '" ' + S + '/>';
       s += '<path d="M-46,-382 Q-55,-362 -56,-338" fill="none" stroke="#45121b" stroke-width="2" stroke-linecap="round"/>';
       s += '<path d="M-32,-322 Q-37,-292 -32,-264 M40,-326 Q37,-300 42,-274 M-10,-254 Q14,-249 34,-256" fill="none" stroke="#45121b" stroke-width="1.8" stroke-linecap="round"/>';
-      s += '<path d="M8,-436 L4,-406 Q18,-398 34,-406 L38,-436 Z" fill="' + SK + '" ' + S + '/>';
+      s += '<path d="M8,-444 L4,-406 Q18,-398 34,-406 L38,-444 Z" fill="' + SK + '" ' + S + '/>';
       s += '<path d="M10,-410 L25,-384 L38,-410 Z" fill="' + SK + '" ' + S + '/>';
       s += '<path d="M4,-414 Q-12,-406 -16,-388 L6,-386 L15,-400 Z" fill="#6a2230" ' + S + '/><path d="M38,-412 Q50,-400 52,-381 L30,-383 L22,-398 Z" fill="#6a2230" ' + S + '/>';
       s += '<text x="0" y="0" transform="translate(45 -347) skewY(-5) scale(.88 1)" text-anchor="middle" font-size="8.4" font-weight="800" letter-spacing="1" fill="#efe3c8" style="font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif">APM</text>';
@@ -460,7 +460,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         turn: C(0, 55, .82), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 95, .5),
         anger: C(.85, 14, 1), red: C(0, 4, 1), steam: C(0, 3, 1), mark: C(0, 60, .45), lid: C(.4, 30, 1), mouth: C(.85, 20, 1),
         tapAmp: C(0, 8, 1), shake: C(0, 16, 1), wTap: C(0, 16, 1), walk: C(0, 18, 1),
-        phone: C(0, 50, 1), point: C(0, 60, 1), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
+        phone: C(0, 50, 1), point: C(0, 60, 1), stomp: C(0, 160, .55), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
       };
     }
     function set(o) { for (var k in o) ch[k].t = o[k]; }
@@ -508,13 +508,36 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         set({ turn: .7, lookX: -.1, lookY: .25 }); ch.shake.t = 1; await sleep(rnd(1100, 1700)); if (tok !== abort) return;
         ch.shake.t = 0; set(LOOK_TAB); await sleep(500);
       },
+      stomp: async function (tok) {
+        set(LOOK_YOU); set({ lUp: -8, lFo: 20 }); await sleep(300); if (tok !== abort) return;
+        for (var i = 0; i < 3; i++) {
+          ch.stomp.t = 1; await sleep(190); if (tok !== abort) return;
+          ch.stomp.t = 0; ch.stomp.vel -= 4; await sleep(130); if (tok !== abort) return;
+          ch.sigh.vel += 7; ch.pitch.vel += 2; await sleep(160); if (tok !== abort) return;
+        }
+        await sleep(400); if (tok !== abort) return;
+        set(REST); set(LOOK_TAB); await sleep(600);
+      },
+      pointTab: async function (tok) {
+        set(LOOK_YOU); set({ lUp: 118, lFo: 6, point: 1 }); await sleep(450); if (tok !== abort) return;
+        ch.wTap.t = .7; await sleep(rnd(1200, 1600)); if (tok !== abort) return;
+        ch.wTap.t = 0; set(LOOK_TAB); await sleep(800); if (tok !== abort) return;
+        set(LOOK_YOU); await sleep(700); if (tok !== abort) return;
+        set(REST); set(LOOK_TAB); await sleep(700);
+      },
+      pointClock: async function (tok) {
+        set({ turn: .25, lookX: -.6, lookY: -1, tilt: -3 }); set({ lUp: -140, lFo: -14, point: 1 }); await sleep(500); if (tok !== abort) return;
+        ch.wTap.t = .6; await sleep(rnd(1000, 1400)); if (tok !== abort) return;
+        set(LOOK_YOU); set({ tilt: -3 }); await sleep(rnd(1000, 1400)); if (tok !== abort) return;
+        ch.wTap.t = 0; set(REST); set(LOOK_TAB); await sleep(750);
+      },
       none: function () { return sleep(10); }
     };
     var PLAN = [
       [7000, 12000, [["glance", 5], ["cross", 2], ["none", 3]]],
-      [4000, 7000, [["cross", 4], ["watch", 4], ["glance", 3]]],
-      [2500, 4500, [["tapWatch", 4], ["shakeHead", 3], ["watch", 1], ["cross", 1], ["glance", 2]]],
-      [1500, 3000, [["tapWatch", 4], ["shakeHead", 4], ["glance", 1], ["cross", 1]]]
+      [4000, 7000, [["cross", 4], ["watch", 4], ["glance", 3], ["pointTab", 1], ["pointClock", 1]]],
+      [2500, 4500, [["tapWatch", 3], ["shakeHead", 2], ["stomp", 2], ["pointTab", 2], ["pointClock", 2], ["watch", 1], ["cross", 1], ["glance", 1]]],
+      [1500, 3000, [["tapWatch", 3], ["shakeHead", 3], ["stomp", 3], ["pointTab", 2], ["pointClock", 2], ["glance", 1], ["cross", 1]]]
     ];
     function pick(list) {
       var sum = 0; list.forEach(function (x) { sum += x[1]; });
@@ -539,7 +562,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       var wa = cl(v("walk"), 0, 1.2), wph = T * 10, legA = wa * 20 * Math.sin(wph);
       var bob = -Math.abs(Math.cos(wph)) * 4 * wa + Math.sin(T * 1.7) * 1.1 + v("sigh") * 2;
       el.man.setAttribute("transform", "translate(" + v("x").toFixed(1) + " 772)");
-      el.legL.setAttribute("transform", "rotate(" + legA.toFixed(2) + " -20 -214)");
+      var st = Math.max(0, v("stomp"));
+      el.legL.setAttribute("transform", "translate(" + (st * 4).toFixed(2) + " " + (-st * 34).toFixed(2) + ") rotate(" + (legA - st * 8).toFixed(2) + " -20 -214)");
       el.legR.setAttribute("transform", "rotate(" + (-legA).toFixed(2) + " 17 -214)");
       el.shoeL.setAttribute("transform", "rotate(" + (-foot * 12).toFixed(2) + " -40 -3)");
       el.upper.setAttribute("transform", "translate(0 " + bob.toFixed(2) + ")");
@@ -682,7 +706,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       var tok = ++abort; exiting = true; busy = true; walking = false; walkDone = null; clearNods();
       set({ wTap: 0, shake: 0, point: 0, tapAmp: 0, tilt: 0 });
       (async function () {
-        set(REST); set({ turn: .4, lookX: 0, lookY: .4 }); ch.pitch.t = 0; await sleep(450);
+        set(REST); ch.stomp.t = 0; set({ turn: .4, lookX: 0, lookY: .4 }); ch.pitch.t = 0; await sleep(450);
         set({ lUp: -14, lFo: -4 }); await sleep(430);
         ch.phone.t = 1; ch.phone.v = 1;
         set(PHONE); ch.pitch.t = .9; await sleep(1250);
