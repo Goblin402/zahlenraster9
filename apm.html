@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="APM">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f3ede2">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>APM · Aki Pace Maker</title>
+<style>
+:root{
+  --paper:#f3ede2; --paper2:#e9e0cf; --ink:#1e1b18; --ink2:#6f665d; --line:rgba(30,27,24,.14);
+  --sake:#e2725b; --shu:#c43b2b; --matcha:#5b8c51; --yuzu:#d29a2c;
+  --st:var(--matcha);
+  --mincho:"Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","Noto Serif JP","Songti SC",Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Helvetica Neue",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:var(--sans);overflow:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none}
+body{
+  background-color:var(--paper);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24'%3E%3Cg fill='none' stroke='%231e1b18' stroke-opacity='.045' stroke-width='1'%3E%3Cpath d='M0 24a24 24 0 0 1 48 0M7 24a17 17 0 0 1 34 0M14 24a10 10 0 0 1 20 0M-24 12a24 24 0 0 1 48 0M24 12a24 24 0 0 1 48 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 16px) max(20px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 18px) max(20px,env(safe-area-inset-left,0px))}
+.screen.on{display:flex}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.scroll *{touch-action:pan-y}
+.mincho{font-family:var(--mincho)}
+.num{font-family:var(--mincho);font-variant-numeric:tabular-nums lining-nums}
+
+/* ---------- Start ---------- */
+#start{align-items:center}
+.wrap{width:100%;max-width:420px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
+.brand{margin-top:42px;display:flex;align-items:center;gap:16px}
+.hanko{width:62px;height:62px;border-radius:8px;background:var(--shu);color:#fbf3e6;display:grid;place-items:center;
+  font:700 19px/1 var(--mincho);letter-spacing:.06em;box-shadow:inset 0 0 0 3px var(--shu),inset 0 0 0 5px rgba(251,243,230,.7);transform:rotate(-4deg)}
+.brand h1{margin:0;font:600 30px/1.05 var(--mincho);letter-spacing:.01em}
+.brand p{margin:5px 0 0;font:500 12px var(--sans);letter-spacing:.22em;text-transform:uppercase;color:var(--ink2)}
+.kanji-side{position:absolute;right:max(14px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 120px);
+  writing-mode:vertical-rl;font:400 15px var(--mincho);letter-spacing:.5em;color:var(--ink2);opacity:.55;pointer-events:none}
+.card{width:100%;margin-top:30px;background:rgba(255,252,246,.72);border:1px solid var(--line);border-radius:22px;padding:22px 20px 20px;
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 12px 30px -18px rgba(60,40,20,.35)}
+.lbl{font:600 11px var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--ink2);text-align:center}
+.stepper{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:10px}
+.stepper button{width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:var(--paper);font:300 28px/1 var(--sans);display:grid;place-items:center}
+.stepper button:active{transform:scale(.92);background:var(--paper2)}
+#tgt{min-width:132px;text-align:center;font-size:76px;line-height:1;font-weight:600}
+#tgt small{font-size:22px;color:var(--ink2);margin-left:4px;font-weight:400}
+.plan{display:flex;justify-content:space-between;margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+.plan div{flex:1;text-align:center}
+.plan b{display:block;font:600 22px var(--mincho)}
+.plan span{font:500 11px var(--sans);color:var(--ink2);letter-spacing:.08em}
+#go{margin-top:24px;width:100%;height:68px;border-radius:34px;background:var(--ink);color:var(--paper);
+  font:700 20px var(--sans);letter-spacing:.28em;display:flex;align-items:center;justify-content:center;gap:14px;
+  box-shadow:0 14px 26px -14px rgba(30,27,24,.8)}
+#go i{font:400 20px var(--mincho);font-style:normal;color:var(--sake);letter-spacing:0}
+#go:active{transform:scale(.98)}
+.meta{margin-top:10px;font:500 12px var(--sans);color:var(--ink2);text-align:center}
+.hist{width:100%;margin-top:26px}
+.hist h2{margin:0 4px 8px;display:flex;justify-content:space-between;align-items:baseline;font:600 11px var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--ink2)}
+.hist h2 span{letter-spacing:.05em;text-transform:none;font-weight:500}
+.hrow{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:14px;text-align:left;border-bottom:1px solid var(--line)}
+.hrow:active{background:rgba(30,27,24,.05)}
+.hrow .n{font:600 24px var(--mincho);min-width:46px}
+.hrow .d{flex:1;font:500 13px var(--sans);color:var(--ink2)}
+.hrow .t{font:600 12px var(--sans);padding:4px 9px;border-radius:20px;color:#fff}
+.empty{padding:14px;text-align:center;font:500 13px var(--sans);color:var(--ink2)}
+
+/* ---------- Countdown ---------- */
+#count{align-items:center;justify-content:center;background:var(--ink);color:var(--paper)}
+#cdN{font:600 46vmin/1 var(--mincho);animation:cd .8s ease-out both}
+#cdN.go{color:var(--sake);font-size:30vmin}
+#cdS{margin-top:14px;font:600 13px var(--sans);letter-spacing:.3em;text-transform:uppercase;opacity:.6}
+@keyframes cd{0%{transform:scale(1.35);opacity:0}25%{opacity:1}100%{transform:scale(1);opacity:1}}
+
+/* ---------- Run ---------- */
+#run{padding:0}
+#run::before{content:"";position:absolute;inset:0;pointer-events:none;border:9px solid var(--st);opacity:.85;transition:border-color .5s}
+.top{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) max(22px,env(safe-area-inset-right,0px)) 0 max(70px,env(safe-area-inset-left,0px))}
+.clock{font-size:30px;font-weight:600;letter-spacing:.02em}
+.clock small{display:block;font:600 10px var(--sans);letter-spacing:.24em;color:var(--ink2);text-transform:uppercase;margin-top:2px}
+#end{position:relative;height:40px;padding:0 16px;border-radius:20px;border:1px solid var(--line);background:rgba(255,252,246,.8);
+  font:600 13px var(--sans);letter-spacing:.06em;overflow:hidden;color:var(--ink2)}
+#end .fill{position:absolute;inset:0;background:var(--shu);transform-origin:left;transform:scaleX(0)}
+#end span{position:relative}
+#end.hold .fill{transform:scaleX(1);transition:transform 1s linear}
+#end.hold span{color:#fff}
+#tap{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none}
+#cnt{font-size:min(46vw,34vh);line-height:.9;font-weight:600;transition:transform .08s}
+#cnt.bump{transform:scale(1.06)}
+.of{margin-top:6px;font:500 15px var(--sans);color:var(--ink2);letter-spacing:.06em}
+.of b{font:400 18px var(--mincho);color:var(--ink);margin-left:4px}
+.soll{margin-top:26px;display:flex;align-items:center;gap:14px}
+.soll .s{font:500 15px var(--sans);color:var(--ink2)}
+.soll .s b{font:600 26px var(--mincho);color:var(--ink);margin-left:6px}
+#diff{min-width:76px;text-align:center;padding:8px 14px;border-radius:24px;background:var(--st);color:#fff;font:600 24px var(--mincho);transition:background .5s}
+.bar{position:absolute;z-index:2;left:max(30px,env(safe-area-inset-left,0px));right:max(30px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 54px);height:10px;border-radius:5px;background:rgba(30,27,24,.08);pointer-events:none}
+#barIst{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--ink);width:0}
+#barSoll{position:absolute;top:-6px;width:3px;height:22px;margin-left:-1.5px;border-radius:2px;background:var(--sake);left:0}
+.hint{position:absolute;z-index:2;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);text-align:center;font:500 12px var(--sans);color:var(--ink2);opacity:.7;pointer-events:none;letter-spacing:.04em}
+.ripple{position:absolute;z-index:1;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:2px solid var(--ink);pointer-events:none;animation:rp .45s ease-out forwards}
+@keyframes rp{from{transform:scale(.3);opacity:.35}to{transform:scale(1.5);opacity:0}}
+#toast{position:absolute;z-index:3;left:50%;top:calc(env(safe-area-inset-top,0px) + 82px);transform:translateX(-50%);padding:9px 18px;border-radius:20px;background:var(--ink);color:var(--paper);font:600 14px var(--sans);opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+
+/* ---------- Flash ---------- */
+#flash{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;color:#fff;background:var(--st)}
+#flash.on{animation:fl 1.9s ease-in-out}
+#flash .big{font:600 34vmin/1 var(--mincho)}
+#flash .sm{margin-top:8px;font:600 16px var(--sans);letter-spacing:.2em;text-transform:uppercase}
+@keyframes fl{0%{opacity:0}8%{opacity:.96}30%{opacity:.96}40%{opacity:.15}50%{opacity:.96}82%{opacity:.96}100%{opacity:0}}
+
+/* ---------- Result ---------- */
+#res .wrap{padding-top:40px;padding-bottom:20px}
+.rtop{display:flex;align-items:flex-end;justify-content:center;gap:10px}
+#rN{font-size:120px;line-height:.9;font-weight:600}
+#rN + span{font:400 30px var(--mincho);color:var(--ink2);margin-bottom:10px}
+#rBadge{margin-top:12px;padding:6px 14px;border-radius:20px;font:700 12px var(--sans);letter-spacing:.2em;text-transform:uppercase;background:var(--shu);color:#fff;display:none}
+#rBadge.on{display:inline-block}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;margin-top:22px}
+.stat{background:rgba(255,252,246,.72);border:1px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center}
+.stat b{display:block;font:600 22px var(--mincho)}
+.stat span{font:600 10px var(--sans);letter-spacing:.16em;color:var(--ink2);text-transform:uppercase}
+.graph{width:100%;margin-top:14px;background:rgba(255,252,246,.72);border:1px solid var(--line);border-radius:18px;padding:12px 10px 6px}
+.graph svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:16px;justify-content:center;font:500 11px var(--sans);color:var(--ink2);padding:6px 0 4px}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;margin-top:10px}
+.seg div{text-align:center;padding:10px 4px;border-radius:14px;border:1px solid var(--line)}
+.seg b{display:block;font:600 19px var(--mincho)}
+.seg span{font:500 11px var(--sans);color:var(--ink2)}
+.btns{display:flex;gap:10px;width:100%;margin-top:20px}
+.btns button{flex:1;height:58px;border-radius:29px;font:700 15px var(--sans);letter-spacing:.14em}
+#again{background:var(--ink);color:var(--paper)}
+#back{border:1px solid var(--line);background:rgba(255,252,246,.8)}
+#del{margin-top:14px;font:500 12px var(--sans);color:var(--ink2);text-decoration:underline;text-underline-offset:3px}
+</style>
+</head>
+<body>
+
+<!-- Start -->
+<section class="screen on scroll" id="start">
+  <div class="kanji-side" aria-hidden="true">回転寿司・三十分</div>
+  <div class="wrap">
+    <div class="brand">
+      <div class="hanko" aria-hidden="true">APM</div>
+      <div><h1>Aki Pace Maker</h1><p>Sushi · 30 Minuten</p></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Ziel · Teller</div>
+      <div class="stepper">
+        <button id="minus" type="button" aria-label="Ziel verringern">−</button>
+        <div id="tgt" class="num" aria-live="polite">50<small>皿</small></div>
+        <button id="plus" type="button" aria-label="Ziel erhöhen">+</button>
+      </div>
+      <div class="plan" id="plan"></div>
+    </div>
+    <button id="go" type="button"><i>始</i>START</button>
+    <div class="meta">Tippen = +1 Teller · nach unten wischen = rückgängig</div>
+    <div class="hist">
+      <h2>Verlauf <span id="best"></span></h2>
+      <div id="hlist"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Countdown -->
+<section class="screen" id="count">
+  <div id="cdN" class="num">3</div>
+  <div id="cdS">Bereit machen</div>
+</section>
+
+<!-- Lauf -->
+<section class="screen" id="run">
+  <div id="tap" aria-label="Antippen zählt einen Teller">
+    <div id="cnt" class="num">0</div>
+    <div class="of">von<b id="ofT" class="num">50</b> 皿</div>
+    <div class="soll"><div class="s">Soll<b id="soll" class="num">0</b></div><div id="diff" class="num">±0</div></div>
+  </div>
+  <div class="top">
+    <div class="clock num"><span id="clk">00:00</span><small id="rem">noch 30:00</small></div>
+    <button id="end" type="button" aria-label="Lauf beenden, gedrückt halten"><div class="fill"></div><span>Halten = Ende</span></button>
+  </div>
+  <div class="bar"><div id="barIst"></div><div id="barSoll"></div></div>
+  <div class="hint">Tippen +1 · nach unten wischen −1</div>
+  <div id="toast">−1 rückgängig</div>
+</section>
+
+<!-- Ergebnis -->
+<section class="screen scroll" id="res">
+  <div class="wrap">
+    <div class="lbl" id="rDate"></div>
+    <div class="rtop" style="margin-top:12px"><div id="rN" class="num">0</div><span>皿</span></div>
+    <div id="rBadge">Neuer Rekord</div>
+    <div class="stats">
+      <div class="stat"><b id="rTgt">50</b><span>Ziel</span></div>
+      <div class="stat"><b id="rDiff">0</b><span>Differenz</span></div>
+      <div class="stat"><b id="rRate">0</b><span>Teller/Min</span></div>
+    </div>
+    <div class="graph"><div id="rGraph"></div>
+      <div class="legend"><span><i style="background:var(--ink)"></i>Ist</span><span><i style="background:var(--sake)"></i>Soll</span></div>
+    </div>
+    <div class="seg" id="rSeg"></div>
+    <div class="btns"><button id="back" type="button">MENÜ</button><button id="again" type="button">NEUER LAUF</button></div>
+    <button id="del" type="button">Diesen Lauf löschen</button>
+  </div>
+</section>
+
+<div id="flash" aria-hidden="true"><div class="big num" id="flBig">+0</div><div class="sm" id="flSm">Minute 2</div></div>
+
+<script>
+(function () {
+  "use strict";
+  var DUR = 30 * 60 * 1000, FLASH_EVERY = 2 * 60 * 1000;
+  var KNOTS = [[0, 0], [10, 22 / 50], [20, 38 / 50], [30, 1]]; // Minute -> Anteil am Ziel (schneller Start)
+  var COL = { ok: "#5b8c51", warn: "#d29a2c", bad: "#c43b2b" };
+  var $ = function (id) { return document.getElementById(id); };
+  var LS = {
+    get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+
+  // Zoom-Gesten sperren (iOS)
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false }); });
+
+  function frac(min) {
+    if (min <= 0) return 0; if (min >= 30) return 1;
+    for (var i = 1; i < KNOTS.length; i++) {
+      var a = KNOTS[i - 1], b = KNOTS[i];
+      if (min <= b[0]) return a[1] + (b[1] - a[1]) * (min - a[0]) / (b[0] - a[0]);
+    }
+    return 1;
+  }
+  function soll(ms, target) { return target * frac(ms / 60000); }
+  function status(d) { return d >= 0 ? "ok" : d >= -2 ? "warn" : "bad"; }
+  function sgn(n) { return n > 0 ? "+" + n : n < 0 ? "−" + Math.abs(n) : "±0"; }
+  function mmss(ms) { ms = Math.max(0, ms); var s = Math.floor(ms / 1000); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function show(id) { ["start", "count", "run", "res"].forEach(function (s) { $(s).classList.toggle("on", s === id); }); }
+  function setSt(st) { document.documentElement.style.setProperty("--st", COL[st]); }
+
+  /* ---------- Start ---------- */
+  var target = LS.get("apm-target", 50);
+  function renderTarget() {
+    $("tgt").innerHTML = target + "<small>皿</small>";
+    $("plan").innerHTML = [10, 20, 30].map(function (m) {
+      return "<div><b>" + Math.round(target * frac(m)) + "</b><span>nach " + m + " min</span></div>";
+    }).join("");
+  }
+  function step(d) { target = Math.max(5, Math.min(200, target + d)); LS.set("apm-target", target); renderTarget(); }
+  function repeatBtn(el, d) {
+    var t1, t2;
+    function stop() { clearTimeout(t1); clearInterval(t2); }
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); step(d); t1 = setTimeout(function () { t2 = setInterval(function () { step(d); }, 80); }, 420); });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function (t) { el.addEventListener(t, stop); });
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); step(d); } });
+  }
+  repeatBtn($("minus"), -1); repeatBtn($("plus"), 1);
+
+  function history() { return LS.get("apm-history", []); }
+  function fmtDate(t) {
+    var d = new Date(t);
+    return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" }) + " · " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  }
+  function renderHist() {
+    var h = history(), box = $("hlist");
+    if (!h.length) { box.innerHTML = '<div class="empty">Noch keine Läufe. Der erste zählt.</div>'; $("best").textContent = ""; return; }
+    var best = Math.max.apply(null, h.map(function (e) { return e.taps.length; }));
+    $("best").textContent = "Rekord " + best + " 皿";
+    box.innerHTML = "";
+    h.slice().reverse().slice(0, 15).forEach(function (e) {
+      var n = e.taps.length, d = n - e.target, b = document.createElement("button");
+      b.type = "button"; b.className = "hrow";
+      b.innerHTML = '<span class="n num">' + n + '</span><span class="d">' + fmtDate(e.date) + (e.early ? " · abgebrochen" : "") + '</span><span class="t" style="background:' + COL[status(d)] + '">' + sgn(d) + "</span>";
+      b.addEventListener("click", function () { showResult(e, false); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- Wake Lock ---------- */
+  var lock = null;
+  function wake() { try { if (navigator.wakeLock && !lock) navigator.wakeLock.request("screen").then(function (l) { lock = l; l.addEventListener("release", function () { lock = null; }); }, function () {}); } catch (e) {} }
+  function unwake() { try { if (lock) lock.release(); } catch (e) {} lock = null; }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && run) wake(); });
+
+  /* ---------- Countdown ---------- */
+  var cdTimer = null;
+  function countdown() {
+    show("count"); wake();
+    var seq = [["3", "Bereit machen"], ["2", "Teller im Blick"], ["1", "Los geht's gleich"], ["始め", "Los!"]], i = 0;
+    (function next() {
+      var n = $("cdN");
+      n.textContent = seq[i][0]; n.className = "num" + (i === 3 ? " go" : "");
+      void n.offsetWidth; n.style.animation = "none"; void n.offsetWidth; n.style.animation = "";
+      $("cdS").textContent = seq[i][1];
+      if (i === 3) { startRun(); return; }
+      i++; cdTimer = setTimeout(next, 800);
+    })();
+  }
+
+  /* ---------- Lauf ---------- */
+  var run = null, raf = 0, lastTxt = {};
+  function save() { if (run) LS.set("apm-run", run); }
+  function startRun() {
+    run = { start: Date.now(), target: target, taps: [], flashed: 0 };
+    save();
+    setTimeout(enterRun, 450);
+  }
+  function enterRun() {
+    show("run"); wake(); lastTxt = {};
+    $("ofT").textContent = run.target;
+    cancelAnimationFrame(raf); loop();
+  }
+  function txt(id, v) { if (lastTxt[id] !== v) { lastTxt[id] = v; $(id).textContent = v; } }
+  function loop() {
+    if (!run) return;
+    var el = Date.now() - run.start;
+    if (el >= DUR) { finish(false); return; }
+    var n = run.taps.length, s = Math.round(soll(el, run.target)), d = n - s, st = status(d);
+    txt("clk", mmss(el)); txt("rem", "noch " + mmss(DUR - el));
+    txt("cnt", String(n)); txt("soll", String(s)); txt("diff", sgn(d));
+    if (lastTxt.st !== st) { lastTxt.st = st; setSt(st); }
+    var max = Math.max(run.target, n);
+    $("barIst").style.width = Math.min(100, n / max * 100) + "%";
+    $("barSoll").style.left = Math.min(100, soll(el, run.target) / max * 100) + "%";
+    var idx = Math.floor(el / FLASH_EVERY);
+    if (idx > run.flashed) { run.flashed = idx; save(); flash(d, st, Math.round(el / 60000)); }
+    raf = requestAnimationFrame(loop);
+  }
+  function flash(d, st, min) {
+    var f = $("flash");
+    $("flBig").textContent = sgn(d);
+    $("flSm").textContent = "Minute " + min + " · " + (st === "ok" ? "im Plan" : st === "warn" ? "knapp" : "hinten");
+    f.classList.remove("on"); void f.offsetWidth; f.classList.add("on");
+  }
+  function addTap(x, y) {
+    if (!run) return;
+    run.taps.push(Date.now() - run.start); save();
+    var c = $("cnt"); c.classList.add("bump"); setTimeout(function () { c.classList.remove("bump"); }, 90);
+    var r = document.createElement("div"); r.className = "ripple"; r.style.left = x + "px"; r.style.top = y + "px";
+    $("run").appendChild(r); setTimeout(function () { r.remove(); }, 480);
+  }
+  var toastT;
+  function undo() {
+    if (!run || !run.taps.length) return;
+    run.taps.pop(); save();
+    var t = $("toast"); t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("on"); }, 900);
+  }
+  // Gesten: kurzer Tipp = +1, nach unten wischen = −1. Mehrere Finger gleichzeitig zählen einzeln.
+  var ptrs = {};
+  var tapEl = $("tap");
+  tapEl.addEventListener("pointerdown", function (e) { e.preventDefault(); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; });
+  tapEl.addEventListener("pointerup", function (e) {
+    var p = ptrs[e.pointerId]; delete ptrs[e.pointerId]; if (!p) return;
+    var dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (dy > 60 && Math.abs(dx) < dy) undo();
+    else if (Math.hypot(dx, dy) < 30) addTap(e.clientX, e.clientY);
+  });
+  tapEl.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; });
+  document.addEventListener("keydown", function (e) {
+    if (!$("run").classList.contains("on")) return;
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); addTap(innerWidth / 2, innerHeight / 2); }
+    if (e.key === "Backspace" || e.key === "ArrowDown") { e.preventDefault(); undo(); }
+  });
+  // Beenden: 1 Sekunde gedrückt halten
+  var endBtn = $("end"), endT;
+  endBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); endBtn.classList.add("hold"); endT = setTimeout(function () { endBtn.classList.remove("hold"); finish(true); }, 1000); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (t) { endBtn.addEventListener(t, function () { clearTimeout(endT); endBtn.classList.remove("hold"); }); });
+
+  function finish(early) {
+    if (!run) return;
+    cancelAnimationFrame(raf);
+    var el = Math.min(DUR, Date.now() - run.start);
+    var entry = { date: run.start, target: run.target, taps: run.taps.filter(function (t) { return t <= DUR; }), dur: early ? el : DUR, early: !!early };
+    var h = history(), prevBest = h.length ? Math.max.apply(null, h.map(function (e) { return e.taps.length; })) : -1;
+    h.push(entry); if (h.length > 100) h = h.slice(-100);
+    LS.set("apm-history", h); LS.del("apm-run");
+    run = null; unwake();
+    if (!early) flashEnd(entry);
+    showResult(entry, entry.taps.length > prevBest && entry.taps.length > 0);
+  }
+  function flashEnd(e) {
+    var d = e.taps.length - e.target;
+    setSt(status(d)); $("flBig").textContent = e.taps.length; $("flSm").textContent = "Zeit! · " + sgn(d) + " zum Ziel";
+    var f = $("flash"); f.classList.remove("on"); void f.offsetWidth; f.classList.add("on");
+  }
+
+  /* ---------- Ergebnis ---------- */
+  var shown = null;
+  function showResult(e, record) {
+    shown = e;
+    var n = e.taps.length, d = n - e.target, mins = (e.dur || DUR) / 60000;
+    $("rDate").textContent = fmtDate(e.date) + (e.early ? " · nach " + mmss(e.dur) + " beendet" : "");
+    $("rN").textContent = n; $("rTgt").textContent = e.target;
+    $("rDiff").textContent = sgn(d); $("rDiff").style.color = COL[status(d)];
+    $("rRate").textContent = (n / Math.max(mins, 0.01)).toFixed(2).replace(".", ",");
+    $("rBadge").classList.toggle("on", !!record);
+    $("rGraph").innerHTML = graph(e);
+    var plan = [0, 10, 20, 30].map(function (m) { return Math.round(e.target * frac(m)); });
+    $("rSeg").innerHTML = [0, 1, 2].map(function (i) {
+      var a = i * 600000, b = (i + 1) * 600000;
+      var ist = e.taps.filter(function (t) { return t >= a && t < b || (i === 2 && t === b); }).length, sp = plan[i + 1] - plan[i];
+      return '<div><b class="num" style="color:' + COL[status(ist - sp)] + '">' + ist + '</b><span>Min ' + (i * 10) + "–" + (i * 10 + 10) + " · Soll " + sp + "</span></div>";
+    }).join("");
+    $("res").scrollTop = 0;
+    show("res");
+  }
+  function graph(e) {
+    var W = 320, H = 190, L = 30, R = 10, T = 10, B = 24;
+    var n = e.taps.length, ymax = Math.max(e.target, n, 5);
+    ymax = Math.ceil(ymax * 1.08 / 10) * 10;
+    var X = function (ms) { return L + (W - L - R) * ms / DUR; }, Y = function (v) { return T + (H - T - B) * (1 - v / ymax); };
+    var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Teller über die Zeit, Ist gegen Soll">';
+    for (var g = 0; g <= ymax; g += ymax > 60 ? 20 : 10) {
+      s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(g) + '" y2="' + Y(g) + '" stroke="rgba(30,27,24,.08)"/>';
+      s += '<text x="' + (L - 6) + '" y="' + (Y(g) + 3.5) + '" text-anchor="end" font-size="9.5" fill="#6f665d" font-family="-apple-system,sans-serif">' + g + "</text>";
+    }
+    [0, 10, 20, 30].forEach(function (m) {
+      s += '<line x1="' + X(m * 60000) + '" x2="' + X(m * 60000) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="rgba(30,27,24,' + (m % 30 ? ".1" : ".18") + ')" stroke-dasharray="' + (m % 30 ? "2 3" : "0") + '"/>';
+      s += '<text x="' + X(m * 60000) + '" y="' + (H - 8) + '" text-anchor="' + (m === 30 ? "end" : m === 0 ? "start" : "middle") + '" font-size="9.5" fill="#6f665d" font-family="-apple-system,sans-serif">' + m + " min</text>";
+    });
+    var sp = "";
+    for (var m = 0; m <= 30; m += 0.5) sp += (m ? "L" : "M") + X(m * 60000).toFixed(1) + " " + Y(e.target * frac(m)).toFixed(1);
+    s += '<path d="' + sp + '" fill="none" stroke="#e2725b" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round"/>';
+    var ip = "M" + X(0) + " " + Y(0), c = 0;
+    e.taps.forEach(function (t) { ip += "H" + X(t).toFixed(1) + "V" + Y(++c).toFixed(1); });
+    ip += "H" + X(e.dur || DUR).toFixed(1);
+    s += '<path d="' + ip + ' V' + Y(0) + ' H' + X(0) + ' Z" fill="rgba(30,27,24,.06)"/>';
+    s += '<path d="' + ip + '" fill="none" stroke="#1e1b18" stroke-width="2.2" stroke-linejoin="round"/>';
+    s += '<circle cx="' + X(e.dur || DUR) + '" cy="' + Y(n) + '" r="4" fill="#1e1b18"/>';
+    return s + "</svg>";
+  }
+  $("again").addEventListener("click", function () { renderTarget(); countdown(); });
+  $("back").addEventListener("click", function () { renderTarget(); renderHist(); show("start"); });
+  $("del").addEventListener("click", function () {
+    if (!shown) return;
+    var h = history().filter(function (e) { return !(e.date === shown.date && e.taps.length === shown.taps.length); });
+    LS.set("apm-history", h); shown = null; renderHist(); show("start");
+  });
+  $("go").addEventListener("click", countdown);
+
+  /* ---------- Init / Fortsetzen ---------- */
+  renderTarget(); renderHist();
+  var saved = LS.get("apm-run", null);
+  if (saved && saved.start && saved.taps) {
+    run = saved; target = run.target;
+    if (Date.now() - run.start >= DUR) finish(false); else enterRun();
+  }
+})();
+</script>
+</body>
+</html>
