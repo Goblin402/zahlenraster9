@@ -154,7 +154,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       <div class="plan" id="plan"></div>
     </div>
     <button id="go" type="button"><i>始</i>START</button>
-    <div class="meta">Tippen = +1 Teller · nach unten wischen = rückgängig</div>
+    <div class="meta">Tippen oder nach oben wischen = +1 · nach unten wischen = rückgängig</div>
     <div class="hist">
       <h2>Verlauf <span id="best"></span></h2>
       <div id="hlist"></div>
@@ -736,7 +736,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     run.taps.pop(); save();
     var t = $("toast"); t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("on"); }, 900);
   }
-  // Gesten: kurzer Tipp = +1, nach unten wischen = −1. Mehrere Finger gleichzeitig zählen einzeln.
+  // Gesten: kurzer Tipp oder nach oben wischen = +1, nach unten wischen = −1. Mehrere Finger gleichzeitig zählen einzeln.
   var ptrs = {};
   var tapEl = $("tap");
   tapEl.addEventListener("pointerdown", function (e) { e.preventDefault(); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; });
@@ -744,6 +744,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var p = ptrs[e.pointerId]; delete ptrs[e.pointerId]; if (!p) return;
     var dx = e.clientX - p.x, dy = e.clientY - p.y;
     if (dy > 60 && Math.abs(dx) < dy) undo();
+    else if (dy < -60 && Math.abs(dx) < -dy) addTap(e.clientX, e.clientY);   // nach oben wischen = +1
     else if (Math.hypot(dx, dy) < 30) addTap(e.clientX, e.clientY);
   });
   tapEl.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; });
