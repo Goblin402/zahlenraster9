@@ -369,7 +369,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
   /* ---------- Aki: animierte Figur, schräg zum Monitor gedreht ---------- */
   var Aki = (function () {
-    var SK = "#f6c9a0", INK = "#151312", SHIRT = "#4a4f58", PANTS = "#474c52";
+    var SK = "#f6c9a0", INK = "#151312", SHIRT = "#5e1a26", PANTS = "#474c52";
     var S = 'stroke="' + INK + '" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"';
     var HOME = 100, NECK_X = 24, NECK_Y = -406;
     var el = {}, ch = {}, alive = false, raf2 = 0, last = 0, T = 0, abort = 0, busy = false, nextAt = 0, lvl = 1;
@@ -382,7 +382,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       s += '<path d="M-8,44 L-9,97 Q2,103 12,97 L13,44 Z" fill="' + SK + '"/>';
       s += '<path d="M-8,48 L-9,97 Q2,103 12,97 L13,48" fill="none" ' + S + '/>';
       s += '<path d="M-17,-6 Q6,-15 21,-4 Q31,18 32,52 Q14,60 -11,56 Q-19,28 -17,-6 Z" fill="' + SHIRT + '" ' + S + '/>';
-      s += '<path d="M-6,44 Q8,46 22,42" fill="none" stroke="#3a3e46" stroke-width="1.6"/>';
+      s += '<path d="M-6,44 Q8,46 22,42" fill="none" stroke="#45121b" stroke-width="1.6"/>';
       s += '<g id="k-fore' + side + '">';
       if (!watch) s += '<g id="k-phone" opacity="0"><rect x="-14" y="66" width="29" height="52" rx="5" fill="#141414" ' + S + '/><rect x="-10" y="71" width="21" height="40" rx="2" fill="#86b8ff"/><rect x="-10" y="71" width="21" height="8" fill="#a8cdff"/></g>';
       s += '<path d="M-10,-6 L-9,64 L11,64 L12,-6 Z" fill="' + SK + '"/>';
@@ -397,25 +397,26 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     }
     function markup() {
       var s = '<g id="k-man">';
-      s += '<ellipse cx="6" cy="-3" rx="74" ry="9" fill="rgba(70,45,20,.17)"/>';
+      s += '<ellipse cx="4" cy="-3" rx="64" ry="9" fill="rgba(70,45,20,.17)"/>';
       // hinteres Bein (sein linkes), Schuh zeigt zum Monitor
-      s += '<g id="k-legR"><path d="M6,-26 Q1,-12 6,-2 L58,0 Q72,-2 70,-12 Q66,-23 44,-26 Z" fill="#33251d" ' + S + '/><path d="M8,-4 L62,-4" stroke="#21170f" stroke-width="2"/>' +
-        '<path d="M-10,-228 L46,-228 L44,-150 L42,-27 Q41,-20 34,-20 L10,-20 Q4,-20 4,-27 L-2,-160 Z" fill="#40454b" ' + S + '/></g>';
+      s += '<g id="k-legR"><path d="M4,-26 Q-1,-12 4,-2 L52,0 Q66,-2 64,-12 Q60,-23 40,-26 Z" fill="#33251d" ' + S + '/><path d="M6,-4 L56,-4" stroke="#21170f" stroke-width="2"/>' +
+        '<path d="M-6,-228 L40,-228 L38,-150 L36,-27 Q35,-20 28,-20 L8,-20 Q2,-20 2,-27 L-2,-160 Z" fill="#40454b" ' + S + '/></g>';
       // vorderes Bein (sein rechtes)
-      s += '<g id="k-legL"><g id="k-shoeL"><path d="M-46,-26 Q-52,-12 -46,-2 L12,0 Q27,-2 25,-12 Q21,-24 -2,-26 Z" fill="#3b2a21" ' + S + '/><path d="M-44,-4 L16,-4" stroke="#241912" stroke-width="2"/></g>' +
-        '<path d="M-56,-228 L8,-228 L4,-160 L-2,-27 Q-3,-20 -10,-20 L-40,-20 Q-46,-20 -47,-27 L-54,-150 Z" fill="' + PANTS + '" ' + S + '/><path d="M-26,-150 Q-25,-100 -24,-46" fill="none" stroke="#363a40" stroke-width="1.6"/></g>';
+      s += '<g id="k-legL"><g id="k-shoeL"><path d="M-42,-26 Q-48,-12 -42,-2 L12,0 Q26,-2 24,-12 Q20,-24 -2,-26 Z" fill="#3b2a21" ' + S + '/><path d="M-40,-4 L14,-4" stroke="#241912" stroke-width="2"/></g>' +
+        '<path d="M-48,-228 L6,-228 L2,-160 L-2,-27 Q-3,-20 -10,-20 L-36,-20 Q-42,-20 -43,-27 L-46,-150 Z" fill="' + PANTS + '" ' + S + '/><path d="M-22,-150 Q-21,-100 -20,-46" fill="none" stroke="#363a40" stroke-width="1.6"/></g>';
       s += '<g id="k-upper"><g id="k-back"></g>';
-      s += '<path d="M-58,-238 L60,-238 Q58,-206 46,-178 L-55,-178 Z" fill="' + PANTS + '"/><path d="M-58,-238 L-55,-186 M60,-238 Q58,-208 48,-186" fill="none" ' + S + '/><path d="M26,-230 Q28,-202 24,-180" fill="none" stroke="#363a40" stroke-width="1.8"/>';
+      s += '<path d="M-50,-238 L52,-238 Q50,-206 40,-178 L-47,-178 Z" fill="' + PANTS + '"/><path d="M-50,-238 L-47,-186 M52,-238 Q50,-208 42,-186" fill="none" ' + S + '/><path d="M22,-230 Q24,-202 20,-180" fill="none" stroke="#363a40" stroke-width="1.8"/>';
       // Oberkörper in 3/4-Ansicht mit leicht rundem Rücken
-      s += '<path d="M4,-412 Q-30,-414 -52,-398 Q-76,-380 -75,-340 Q-73,-298 -64,-262 Q-60,-240 -54,-234 L62,-234 Q72,-246 74,-272 Q78,-306 70,-346 Q64,-378 46,-398 Q30,-410 14,-412 Z" fill="' + SHIRT + '" ' + S + '/>';
-      s += '<path d="M-54,-380 Q-64,-360 -66,-336" fill="none" stroke="#3a3e46" stroke-width="2" stroke-linecap="round"/>';
-      s += '<path d="M-38,-322 Q-44,-292 -38,-264 M48,-332 Q44,-302 52,-272 M-12,-254 Q16,-248 42,-256" fill="none" stroke="#3a3e46" stroke-width="1.8" stroke-linecap="round"/>';
+      s += '<path d="M4,-412 Q-26,-414 -46,-398 Q-65,-382 -63,-344 Q-61,-300 -55,-262 Q-52,-242 -48,-236 L50,-236 Q55,-248 56,-272 Q58,-306 57,-346 Q55,-378 42,-398 Q28,-410 14,-412 Z" fill="' + SHIRT + '" ' + S + '/>';
+      s += '<path d="M-46,-382 Q-55,-362 -56,-338" fill="none" stroke="#45121b" stroke-width="2" stroke-linecap="round"/>';
+      s += '<path d="M-32,-322 Q-37,-292 -32,-264 M40,-326 Q37,-300 42,-274 M-10,-254 Q14,-249 34,-256" fill="none" stroke="#45121b" stroke-width="1.8" stroke-linecap="round"/>';
       s += '<path d="M8,-436 L4,-406 Q18,-398 34,-406 L38,-436 Z" fill="' + SK + '" ' + S + '/>';
       s += '<path d="M10,-410 L25,-384 L38,-410 Z" fill="' + SK + '" ' + S + '/>';
-      s += '<path d="M4,-414 Q-12,-406 -16,-388 L6,-386 L15,-400 Z" fill="#50555e" ' + S + '/><path d="M38,-412 Q50,-400 52,-381 L30,-383 L22,-398 Z" fill="#50555e" ' + S + '/>';
-      s += '<path d="M26,-384 L28,-340" stroke="' + INK + '" stroke-width="2"/><circle cx="32" cy="-366" r="2.4" fill="#2e3238" stroke="' + INK + '" stroke-width="1.2"/><circle cx="33" cy="-351" r="2.4" fill="#2e3238" stroke="' + INK + '" stroke-width="1.2"/>';
-      s += '<path d="M-58,-252 L66,-252 L66,-236 L-58,-236 Z" fill="#262626" ' + S + '/><path d="M-36,-252 L-36,-236 M-6,-252 L-6,-236" stroke="' + INK + '" stroke-width="1.5"/>';
-      s += '<rect x="32" y="-255" width="26" height="22" rx="3" fill="#626262" ' + S + '/><rect x="38" y="-249" width="14" height="10" rx="1.5" fill="#2b2b2b"/>';
+      s += '<path d="M4,-414 Q-12,-406 -16,-388 L6,-386 L15,-400 Z" fill="#6a2230" ' + S + '/><path d="M38,-412 Q50,-400 52,-381 L30,-383 L22,-398 Z" fill="#6a2230" ' + S + '/>';
+      s += '<text x="0" y="0" transform="translate(45 -347) skewY(-5) scale(.88 1)" text-anchor="middle" font-size="8.4" font-weight="800" letter-spacing="1" fill="#efe3c8" style="font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif">APM</text>';
+      s += '<path d="M26,-384 L28,-340" stroke="' + INK + '" stroke-width="2"/><circle cx="29.5" cy="-366" r="2.3" fill="#3d0f17" stroke="' + INK + '" stroke-width="1.2"/><circle cx="30" cy="-352" r="2.3" fill="#3d0f17" stroke="' + INK + '" stroke-width="1.2"/>';
+      s += '<path d="M-50,-252 L53,-252 L53,-236 L-50,-236 Z" fill="#262626" ' + S + '/><path d="M-30,-252 L-30,-236 M-4,-252 L-4,-236" stroke="' + INK + '" stroke-width="1.5"/>';
+      s += '<rect x="25" y="-255" width="23" height="22" rx="3" fill="#626262" ' + S + '/><rect x="30" y="-249" width="13" height="10" rx="1.5" fill="#2b2b2b"/>';
       // Kopf (Drehpunkt am Hals)
       s += '<g id="k-head">';
       s += '<path id="k-earR" d="M58,-102 Q76,-104 76,-85 Q74,-66 58,-62 Z" fill="' + SK + '" ' + S + ' opacity="0"/>';
@@ -456,7 +457,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     function initCh() {
       ch = {
         lUp: C(-2, 85, .58), lFo: C(8, 85, .58), rUp: C(-9, 85, .58), rFo: C(6, 85, .58),
-        turn: C(0, 55, .82), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 240, .42),
+        turn: C(0, 55, .82), lookX: C(.9, 150, .9), lookY: C(0, 150, .9), pitch: C(0, 95, .5),
         anger: C(.85, 14, 1), red: C(0, 4, 1), steam: C(0, 3, 1), mark: C(0, 60, .45), lid: C(.4, 30, 1), mouth: C(.85, 20, 1),
         tapAmp: C(0, 8, 1), shake: C(0, 16, 1), wTap: C(0, 16, 1), walk: C(0, 18, 1),
         phone: C(0, 50, 1), point: C(0, 60, 1), x: C(HOME, 30, 1), sigh: C(0, 40, .6), tilt: C(0, 60, .7)
@@ -538,14 +539,14 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       var wa = cl(v("walk"), 0, 1.2), wph = T * 10, legA = wa * 20 * Math.sin(wph);
       var bob = -Math.abs(Math.cos(wph)) * 4 * wa + Math.sin(T * 1.7) * 1.1 + v("sigh") * 2;
       el.man.setAttribute("transform", "translate(" + v("x").toFixed(1) + " 772)");
-      el.legL.setAttribute("transform", "rotate(" + legA.toFixed(2) + " -22 -214)");
-      el.legR.setAttribute("transform", "rotate(" + (-legA).toFixed(2) + " 20 -214)");
-      el.shoeL.setAttribute("transform", "rotate(" + (-foot * 12).toFixed(2) + " -44 -3)");
+      el.legL.setAttribute("transform", "rotate(" + legA.toFixed(2) + " -20 -214)");
+      el.legR.setAttribute("transform", "rotate(" + (-legA).toFixed(2) + " 17 -214)");
+      el.shoeL.setAttribute("transform", "rotate(" + (-foot * 12).toFixed(2) + " -40 -3)");
       el.upper.setAttribute("transform", "translate(0 " + bob.toFixed(2) + ")");
       var swing = wa * 14 * Math.sin(wph);
-      el.armL.setAttribute("transform", "translate(-44 -376) scale(-1 1) rotate(" + v("lUp").toFixed(2) + ")");
+      el.armL.setAttribute("transform", "translate(-38 -376) scale(-1 1) rotate(" + v("lUp").toFixed(2) + ")");
       el.foreL.setAttribute("transform", "translate(2 95) rotate(" + (v("lFo") + Math.sin(T * 17) * 6 * v("wTap")).toFixed(2) + ")");
-      el.armR.setAttribute("transform", "translate(50 -374) rotate(" + (v("rUp") - swing).toFixed(2) + ")");
+      el.armR.setAttribute("transform", "translate(43 -374) rotate(" + (v("rUp") - swing).toFixed(2) + ")");
       el.foreR.setAttribute("transform", "translate(2 95) rotate(" + (v("rFo") - swing * .4).toFixed(2) + ")");
       // hinterer Arm: vor den Körper, sobald er angehoben wird
       var front = v("rFo") > 55;
@@ -558,9 +559,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       el.head.setAttribute("transform", "translate(" + NECK_X + " " + (NECK_Y + p * 6).toFixed(2) + ") rotate(" + (4 + sh * 4 + v("tilt") + p * 3).toFixed(2) + ")");
       face(blink, sh, p);
     }
-    function eyePath(ex, ey, rx, ht, hb) {
-      return P(["M", ex - rx, ey + 1.5, "C", ex - rx * .55, ey - ht * 1.3, ex + rx * .5, ey - ht * 1.3, ex + rx, ey - 1,
-        "C", ex + rx * .55, ey + hb * 1.25, ex - rx * .5, ey + hb * 1.25, ex - rx, ey + 1.5, "Z"]);
+    function eyePath(ex, ey, rx, ht, hb, oL, oR) {
+      return P(["M", ex - rx, ey + 1.5 + oL, "C", ex - rx * .55, ey - ht * 1.3 + oL * .5, ex + rx * .5, ey - ht * 1.3 + oR * .5, ex + rx, ey - 1 + oR,
+        "C", ex + rx * .55, ey + hb * 1.25 + oR * .5, ex - rx * .5, ey + hb * 1.25 + oL * .5, ex - rx, ey + 1.5 + oL, "Z"]);
     }
     function face(blink, sh, p) {
       var turn = ch.turn.v, a = ch.anger.v, m = ch.mouth.v;
@@ -570,18 +571,20 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       for (var i = 0; i < 2; i++) {
         var rx = i ? 16.5 * (1 - .15 * (1 - turn)) : 18, ht = 8.5, hb = 6;
         var ex = (i ? 26 : -25) + dx * (i ? 1.1 : .8), ey = -85 + dy;
-        var d = eyePath(ex, ey, rx, ht, hb);
+        var SL = 4.6, oL = i ? SL : -SL, oR = i ? -SL : SL;   // Innenwinkel (zur Nase) tiefer
+        var d = eyePath(ex, ey, rx, ht, hb, oL, oR);
         el["ce" + i].setAttribute("d", d); el["ew" + i].setAttribute("d", d); el["eo" + i].setAttribute("d", d);
-        attrs(el["pu" + i], { cx: ex + lx * (rx - 5), cy: ey + ly * 3.2 + .5 });
+        var px = ex + lx * (rx - 5), pf = (px - (ex - rx)) / (2 * rx);
+        attrs(el["pu" + i], { cx: px, cy: ey + ly * 3.2 + .5 + (oL + (oR - oL) * pf) * .6 });
         var topE = ey - ht, base = topE + (ht + hb) * lid, inn = base + a * 3, out = base - a * 1.6;
-        var yL = i ? inn : out, yR = i ? out : inn, x1 = ex - rx - 4, x2 = ex + rx + 4;
-        el["lid" + i].setAttribute("points", P([x1, topE - 6, x2, topE - 6, x2, yR, x1, yL]));
+        var yL = (i ? inn : out) + oL * 1.1, yR = (i ? out : inn) + oR * 1.1, x1 = ex - rx - 4, x2 = ex + rx + 4;
+        el["lid" + i].setAttribute("points", P([x1, topE - 12, x2, topE - 12, x2, yR, x1, yL]));
         attrs(el["ll" + i], { x1: x1, y1: yL, x2: x2, y2: yR });
         // Augenbrauen: dick, nach innen tief gezogen
         var xi = i ? ex - rx + 1 : ex + rx - 1, xo = i ? ex + rx + 4 : ex - rx - 4, xm = (xi + xo) / 2;
         var yi = ey - 12 + a * 6, yo = ey - 19 - a * 1.5, ym = (yi + yo) / 2 - 1;
         el["br" + i].setAttribute("points", P([xo, yo - 3, xm, ym - 5, xi, yi - 5.6, xi, yi + 4.4, xm, ym + 3.6, xo, yo + 3]));
-        el["bag" + i].setAttribute("d", P(["M", ex - rx + 3, ey + hb + 4.5, "Q", ex, ey + hb + 9, ex + rx - 2, ey + hb + 4, "M", ex - rx + 7, ey + hb + 9.5, "Q", ex + 1, ey + hb + 12, ex + rx - 6, ey + hb + 9]));
+        el["bag" + i].setAttribute("d", P(["M", ex - rx + 3, ey + hb + 4.5 + oL * .7, "Q", ex, ey + hb + 9, ex + rx - 2, ey + hb + 4 + oR * .7, "M", ex - rx + 7, ey + hb + 9.5 + oL * .5, "Q", ex + 1, ey + hb + 12, ex + rx - 6, ey + hb + 9 + oR * .5]));
       }
       // Nase: kräftig, rechte Kontur mit runder Spitze und Nasenflügeln
       var nx = dx * 1.4;
@@ -670,7 +673,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     function nod() {
       var t = setTimeout(function () {
         nodTimers.splice(nodTimers.indexOf(t), 1);
-        if (alive && !exiting) ch.pitch.vel += 10;
+        if (alive && !exiting) ch.pitch.vel += 6.4;
       }, 670);
       nodTimers.push(t);
     }
