@@ -737,7 +737,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var SK = "#f6c9a0", INK = "#151312", HOOD = "#3b4556", PANTS = "#43474d", SHOE = "#2e3033";
     var S = 'stroke="' + INK + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"';
     var SPOT = 300, el = {}, ch = {}, alive = false, raf = 0, last = 0, T = 0, tok = 0, walking = false, goal = 0, dir = -1, done = null, blinkUntil = 0, nextBlink = 0;
-    var busy = false;
+    var busy = false, LIDS = [];
     function C(v, k, z) { return { v: v, t: v, vel: 0, k: k, z: z }; }
     function init() {
       ch = { x: C(560, 30, 1), walk: C(0, 14, 1), lookX: C(0, 120, .9), lookY: C(0, 120, .9), nod: C(0, 110, .6), shake: C(0, 14, 1), turn: C(0, 50, .85), suck: C(0, 20, 1) };
@@ -775,21 +775,46 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       s += '<path d="M-52,-226 Q-58,-188 -44,-166 Q-30,-146 -2,-146 Q28,-146 44,-164 Q58,-186 54,-222 Q50,-262 0,-266 Q-46,-264 -52,-226 Z" fill="' + SK + '" ' + S + '/>';
       s += '<path d="M-56,-206 Q-62,-246 -42,-262 L-40,-276 L-27,-266 L-16,-283 L-4,-269 L9,-284 L18,-268 L32,-279 L34,-262 Q58,-250 55,-222 Q48,-238 32,-243 Q14,-236 -6,-246 Q-26,-237 -38,-231 Q-48,-222 -51,-206 Z" fill="#121212" ' + S + '/>';
       s += '<g id="s-face">';
-      [-19, 19].forEach(function (x, i) {
-        s += '<ellipse cx="' + x + '" cy="-206" rx="10" ry="6.3" fill="#fff" ' + S + '/>';
-        s += '<circle id="s-pu' + i + '" cx="' + x + '" cy="-206" r="4.6" fill="' + INK + '"/>';
-        s += '<rect id="s-lid' + i + '" x="' + (x - 11) + '" y="-213" width="22" height="0" fill="' + SK + '"/>';
-        s += '<path d="M' + (x - 9) + ',-221 Q' + x + ',-225 ' + (x + 9) + ',-221" fill="none" stroke="' + INK + '" stroke-width="2" stroke-linecap="round"/>';
-      });
-      s += '<path d="M-6,-190 Q-9,-183 -3,-181 Q0,-180 3,-181 Q9,-183 6,-190" fill="none" stroke="' + INK + '" stroke-width="1.8" stroke-linecap="round"/>';
-      s += '<path d="M-36,-176 Q-30,-168 -24,-172 M30,-176 Q26,-168 20,-172" fill="none" stroke="' + INK + '" stroke-width="1.4" stroke-linecap="round" opacity=".6"/>';
+      // Gesicht wie beim Vater (schräge Augen, dicke Brauen, gleiche Nase), verkleinert
+      s += '<g transform="translate(0 -140) scale(.78)">';
+      var f2 = function (v) { return typeof v === "number" ? v.toFixed(1) : v; }, PP = function (a) { return a.map(f2).join(" "); };
+      var a = .85, SL = 4.6, ht = 8.5, hb = 6, ey = -85;
+      LIDS = [];
+      for (var i = 0; i < 2; i++) {
+        var rx = i ? 16.5 : 18, ex = i ? 26 : -25, oL = i ? SL : -SL, oR = i ? -SL : SL;
+        var eye = PP(["M", ex - rx, ey + 1.5 + oL, "C", ex - rx * .55, ey - ht * 1.3 + oL * .5, ex + rx * .5, ey - ht * 1.3 + oR * .5, ex + rx, ey - 1 + oR,
+          "C", ex + rx * .55, ey + hb * 1.25 + oR * .5, ex - rx * .5, ey + hb * 1.25 + oL * .5, ex - rx, ey + 1.5 + oL, "Z"]);
+        var topE = ey - ht, x1 = ex - rx - 4, x2 = ex + rx + 4;
+        var lidPts = function (lid) {
+          var base = topE + (ht + hb) * lid, inn = base + a * 3, out = base - a * 1.6;
+          var yL = (i ? inn : out) + oL * 1.1, yR = (i ? out : inn) + oR * 1.1;
+          return [PP([x1, topE - 12, x2, topE - 12, x2, yR, x1, yL]), [x1, yL, x2, yR]];
+        };
+        var open = lidPts(.4), shut = lidPts(1.1);
+        LIDS[i] = [open[0], shut[0], open[1], shut[1]];
+        s += '<clipPath id="s-c' + i + '" clipPathUnits="userSpaceOnUse"><path d="' + eye + '"/></clipPath>';
+        s += '<path d="' + eye + '" fill="#fff"/>';
+        s += '<g clip-path="url(#s-c' + i + ')"><circle id="s-pu' + i + '" cx="' + ex + '" cy="' + (ey + .5) + '" r="3.6" fill="' + INK + '"/>' +
+          '<polygon id="s-lid' + i + '" points="' + open[0] + '" fill="' + SK + '"/>' +
+          '<line id="s-ll' + i + '" x1="' + f2(open[1][0]) + '" y1="' + f2(open[1][1]) + '" x2="' + f2(open[1][2]) + '" y2="' + f2(open[1][3]) + '" stroke="' + INK + '" stroke-width="3.2" stroke-linecap="round"/></g>';
+        s += '<path d="' + eye + '" fill="none" stroke="' + INK + '" stroke-width="2.4" stroke-linejoin="round"/>';
+        var xi = i ? ex - rx + 1 : ex + rx - 1, xo = i ? ex + rx + 4 : ex - rx - 4, xm = (xi + xo) / 2;
+        var yi = ey - 12 + a * 6, yo = ey - 19 - a * 1.5, ym = (yi + yo) / 2 - 1;
+        s += '<polygon points="' + PP([xo, yo - 3, xm, ym - 5, xi, yi - 5.6, xi, yi + 4.4, xm, ym + 3.6, xo, yo + 3]) + '" fill="' + INK + '" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
+        s += '<path d="' + PP(["M", ex - rx + 3, ey + hb + 4.5 + oL * .7, "Q", ex, ey + hb + 9, ex + rx - 2, ey + hb + 4 + oR * .7]) + '" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-linecap="round" opacity=".6"/>';
+      }
+      s += '<path d="' + PP(["M", 5, -80, "C", 7, -68, 14, -61, 17, -55, "C", 21, -48, 16, -42, 9, -43, "Q", 5, -43, 3, -46,
+        "M", -7, -52, "Q", -11, -46, -5, -43, "Q", -1, -42, 3, -46]) + '" fill="none" stroke="' + INK + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+      s += '<path d="M-3,-114 Q-1,-106 -3,-100 M6,-114 Q8,-106 6,-100" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-linecap="round" opacity=".7"/>';
+      s += '<path d="M-14,-55 Q-24,-46 -24,-34 M24,-53 Q31,-44 29,-34" fill="none" stroke="' + INK + '" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>';
+      s += '</g>';
       s += '<path d="M-14,-150 Q0,-145 14,-150" fill="none" stroke="' + INK + '" stroke-width="1.5" opacity=".6"/>';
-      s += '<g id="s-paci"><ellipse cx="0" cy="-166" rx="16" ry="11" fill="#8ec3ee" ' + S + '/><circle cx="0" cy="-165" r="8.5" fill="none" stroke="#5b9ad6" stroke-width="3.6"/><circle cx="0" cy="-165" r="8.5" fill="none" stroke="' + INK + '" stroke-width="1.2"/><circle cx="0" cy="-168" r="3.2" fill="#a9d3f5" stroke="' + INK + '" stroke-width="1.2"/></g>';
+      s += '<g id="s-paci"><ellipse cx="0" cy="-161" rx="15" ry="10.5" fill="#8ec3ee" ' + S + '/><circle cx="0" cy="-160" r="8" fill="none" stroke="#5b9ad6" stroke-width="3.4"/><circle cx="0" cy="-160" r="8" fill="none" stroke="' + INK + '" stroke-width="1.2"/><circle cx="0" cy="-163" r="3" fill="#a9d3f5" stroke="' + INK + '" stroke-width="1.2"/></g>';
       s += '</g></g></g></g>';
       return s;
     }
     function bind() {
-      ["kid", "legL", "legR", "body", "armL", "armR", "head", "face", "pu0", "pu1", "lid0", "lid1", "paci"].forEach(function (k) { el[k] = document.getElementById("s-" + k); });
+      ["kid", "legL", "legR", "body", "armL", "armR", "head", "face", "pu0", "pu1", "lid0", "lid1", "ll0", "ll1", "paci"].forEach(function (k) { el[k] = document.getElementById("s-" + k); });
     }
     function step(dt) { for (var k in ch) { var c = ch[k], d = 2 * c.z * Math.sqrt(c.k); c.vel += (c.k * (c.t - c.v) - d * c.vel) * dt; c.v += c.vel * dt; } }
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -808,10 +833,12 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       el.face.setAttribute("transform", "translate(" + fx.toFixed(2) + " " + fy.toFixed(2) + ")");
       for (var i = 0; i < 2; i++) {
         el["pu" + i].setAttribute("transform", "translate(" + (ch.lookX.v * 4.5).toFixed(2) + " " + (ch.lookY.v * 3.4).toFixed(2) + ")");
-        el["lid" + i].setAttribute("height", blink ? 14 : 0);
+        var L = LIDS[i], q = blink ? 1 : 0;
+        el["lid" + i].setAttribute("points", L[q]);
+        var c = L[2 + q]; el["ll" + i].setAttribute("x1", c[0]); el["ll" + i].setAttribute("y1", c[1]); el["ll" + i].setAttribute("x2", c[2]); el["ll" + i].setAttribute("y2", c[3]);
       }
       var sk = 1 + .06 * Math.sin(T * 7) * ch.suck.v;
-      el.paci.setAttribute("transform", "translate(0 -166) scale(" + sk.toFixed(3) + ") translate(0 166)");
+      el.paci.setAttribute("transform", "translate(0 -161) scale(" + sk.toFixed(3) + ") translate(0 161)");
     }
     function frame(now) {
       if (!alive) return;
