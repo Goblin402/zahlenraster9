@@ -109,7 +109,7 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
   }
   function now() { return (performance.now() - t0) / 1000 + extra; }
   function render() {
-    var tk = tasks[idx];
+    var tk = state === "intro" ? null : tasks[idx]; // vor dem Start keine Aufgabe zeigen
     $("card").textContent = tk ? tk.text : "? = ?"; $("card").className = "card";
     btns.forEach(function (b, i) { b.textContent = tk ? tk.opts[i] : ""; b.className = ""; });
     [].slice.call($("dots").children).forEach(function (d, i) { d.className = i <= idx && state !== "intro" ? "on" : ""; });
