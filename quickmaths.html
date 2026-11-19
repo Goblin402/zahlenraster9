@@ -1,0 +1,200 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Quick Maths</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Quick Maths: 5 Rechenaufgaben nacheinander, je 4 Antworten. Falsch = +2 s (so zählt das Original wirklich, obwohl dort +3 s steht).
+   Zeit läuft ab der ersten Aufgabe durchgehend. Richtig: Knopf 0,4 s grün, dann nächste Aufgabe. Falsch: Knopf 0,4 s rot, Rahmen rot, "+2s" blinkt.
+   Maße (390 x 844): Punkte bei 278, Karte 16–373 / 293–443, Knöpfe 16–190 und 199–373, Reihen 478–578 und 588–686. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: light; }
+html, body { height: 100%; }
+body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden; margin: 0;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(29, 26, 63, 0.88); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #1d1a3f; outline-offset: 2px; }
+.clock { position: absolute; left: 0; right: 0; top: 20%; text-align: center; font-size: min(5vw, 20px); opacity: 0.55; font-variant-numeric: tabular-nums; }
+.dots { position: absolute; left: 0; right: 0; top: calc(278 / 844 * 100%); transform: translateY(-50%); display: flex; justify-content: center; gap: calc(7 / 390 * 100vw); }
+.dots i { width: calc(9 / 390 * 100vw); max-width: 10px; aspect-ratio: 1; border-radius: 50%; background: #d6ccc2; }
+.dots i.on { background: #1d1a3f; }
+.card { position: absolute; left: calc(16 / 390 * 100%); right: calc(17 / 390 * 100%); top: calc(293 / 844 * 100%); height: calc(150 / 844 * 100%);
+  background: #fff; border-radius: 16px; box-sizing: border-box; border: 2px solid transparent; display: flex; align-items: center; justify-content: center;
+  font-size: min(9.4vw, 42px); letter-spacing: 0.04em; white-space: nowrap; }
+.card.bad { border-color: #ef3a3d; }
+.btns { position: absolute; left: calc(16 / 390 * 100%); right: calc(17 / 390 * 100%); top: calc(478 / 844 * 100%); height: calc(208 / 844 * 100%);
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; column-gap: calc(9 / 390 * 100vw); row-gap: calc(10 / 844 * 100vh); }
+.btns button { border: 0; border-radius: 999px; color: #fff; font: inherit; font-size: min(8vw, 34px); letter-spacing: 0.04em; cursor: pointer;
+  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.22); padding: 0 0 4px; font-variant-numeric: tabular-nums; }
+.btns button:focus-visible { outline: 3px solid #1d1a3f; outline-offset: 2px; }
+.btns button:nth-child(1) { background: #ff5e92; }
+.btns button:nth-child(2) { background: #41d975; }
+.btns button:nth-child(3) { background: #30b4f6; }
+.btns button:nth-child(4) { background: #fcb61f; }
+.btns button.ok { background: #1ebd53 !important; }
+.btns button.no { background: #ff3435 !important; }
+.pen { position: absolute; left: 50%; top: calc(773 / 844 * 100%); transform: translate(-50%, -50%); background: #ff6262; color: #fff; border-radius: 999px;
+  padding: 3px 12px; font-size: 13px; opacity: 0; pointer-events: none; }
+.pen.on { animation: blink 0.9s linear forwards; }
+@keyframes blink { 0%, 8% { opacity: 1; } 9%, 15% { opacity: 0.2; } 16%, 22% { opacity: 1; } 23%, 29% { opacity: 0.2; } 30%, 45% { opacity: 1; } 100% { opacity: 0; } }
+.intro { position: absolute; inset: 0; z-index: 4; background: rgba(40, 36, 32, 0.78); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.intro[hidden] { display: none; }
+.intro p { font-size: min(7vw, 28px); text-align: center; line-height: 1.15; margin: 0 0 18vh; }
+.pulse { position: absolute; left: 50%; top: 79%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #fff; animation: pu 1.1s ease-in-out infinite; }
+@keyframes pu { 0%, 100% { transform: scale(0.75); opacity: 0.55; } 50% { transform: scale(1); opacity: 1; } }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(12, 10, 24, 0.9); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="clock" id="clock">0s</div>
+<div class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i></div>
+<div class="card" id="card">? = ?</div>
+<div class="btns" id="btns"><button type="button"></button><button type="button"></button><button type="button"></button><button type="button"></button></div>
+<div class="pen" id="pen">+2s</div>
+<div class="intro" id="intro"><p>Löse die Gleichung.<br>Wähle die richtige<br>Antwort!</p><div class="pulse"></div></div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0.00s</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  var N = 5, PENALTY = 2, SHOW = 0.4;
+  var $ = function (id) { return document.getElementById(id); };
+  var btns = [].slice.call($("btns").children);
+  var state = "intro", tasks = [], idx = 0, t0 = 0, extra = 0, best = 0, gen = 0, raf = 0, lock = false;
+  try { best = parseFloat(localStorage.getItem("quickmaths-best")) || 0; } catch (e) {}
+  function showBest() { $("best").innerHTML = "<b>Best</b>" + (best ? best.toFixed(2) + "s" : "--"); }
+  showBest();
+  function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  // Aufgaben wie im Original: eine kleine Zahl (1–9) mit einer kleinen oder zweistelligen, Minus nie negativ, Mal nur klein x klein
+  function makeTask() {
+    var op = ["+", "+", "−", "−", "×"][ri(0, 4)], a, b, r;
+    if (op === "×") { a = ri(2, 9); b = ri(2, 9); r = a * b; }
+    else if (op === "+") { var big = Math.random() < 0.5 ? ri(10, 89) : ri(1, 9); var sm = ri(1, 9); if (Math.random() < 0.5) { a = big; b = sm; } else { a = sm; b = big; } r = a + b; }
+    else { a = Math.random() < 0.6 ? ri(11, 99) : ri(5, 9); b = ri(1, Math.min(9, a - 1)); r = a - b; }
+    // falsche Antworten dicht dran (±1 bis ±8), nie negativ, alle verschieden
+    var span = r < 20 ? 5 : 8, opts = [r], same = Math.random() < 0.25; // manchmal alle gerade/ungerade wie 86/88/90/92
+    while (opts.length < 4) {
+      var d = ri(1, span) * (Math.random() < 0.5 ? -1 : 1); if (same) d = 2 * Math.ceil(Math.abs(d) / 2) * Math.sign(d);
+      var v = r + d; if (v >= 0 && opts.indexOf(v) < 0) opts.push(v);
+    }
+    for (var i = 3; i > 0; i--) { var j = ri(0, i), t = opts[i]; opts[i] = opts[j]; opts[j] = t; }
+    return { text: a + " " + op + " " + b + " = ?", r: r, opts: opts };
+  }
+  function now() { return (performance.now() - t0) / 1000 + extra; }
+  function render() {
+    var tk = tasks[idx];
+    $("card").textContent = tk ? tk.text : "? = ?"; $("card").className = "card";
+    btns.forEach(function (b, i) { b.textContent = tk ? tk.opts[i] : ""; b.className = ""; });
+    [].slice.call($("dots").children).forEach(function (d, i) { d.className = i <= idx && state !== "intro" ? "on" : ""; });
+  }
+  function tick() { if (state !== "run") return; $("clock").textContent = Math.floor(now()) + "s"; raf = requestAnimationFrame(tick); }
+  function reset() {
+    gen++; cancelAnimationFrame(raf); state = "intro"; idx = 0; extra = 0; lock = false;
+    tasks = []; for (var i = 0; i < N; i++) tasks.push(makeTask());
+    $("intro").hidden = false; $("result").hidden = true; $("clock").textContent = "0s"; render();
+  }
+  function start() { state = "run"; $("intro").hidden = true; t0 = performance.now(); extra = 0; render(); tick(); }
+  function finish() {
+    state = "done"; cancelAnimationFrame(raf);
+    var t = Math.round(now() * 100) / 100;
+    $("clock").textContent = t.toFixed(2) + "s";
+    var rec = !best || t < best;
+    if (rec) { best = t; try { localStorage.setItem("quickmaths-best", String(best)); } catch (e) {} showBest(); }
+    $("rec").hidden = !rec; $("pts").textContent = t.toFixed(2) + "s";
+    var g = gen; setTimeout(function () { if (g === gen) $("result").hidden = false; }, 400);
+  }
+  btns.forEach(function (b, i) {
+    b.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); if (state !== "run" || lock) return;
+      var tk = tasks[idx], g = gen;
+      if (tk.opts[i] === tk.r) {
+        b.className = "ok"; lock = true;
+        if (idx === N - 1) { finish(); return; }
+        setTimeout(function () { if (g !== gen) return; lock = false; idx++; render(); }, SHOW * 1000);
+      } else {
+        extra += PENALTY; b.className = "no"; $("card").className = "card bad";
+        var p = $("pen"); p.classList.remove("on"); void p.offsetWidth; p.classList.add("on");
+        if (navigator.vibrate) { try { navigator.vibrate(40); } catch (x) {} }
+        setTimeout(function () { if (g !== gen || state !== "run") return; if (b.className === "no") b.className = ""; if (!btns.some(function (x) { return x.className === "no"; })) $("card").className = "card"; }, SHOW * 1000);
+      }
+    });
+  });
+  $("intro").addEventListener("pointerdown", function (e) { e.preventDefault(); if (state === "intro") start(); });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap($("reset"), reset); bindTap($("ok"), reset);
+  reset();
+  window.__qm = { get s() { return { state: state, idx: idx, task: tasks[idx], t: now() }; } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>

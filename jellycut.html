@@ -1,0 +1,287 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Jelly Cut</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap">
+<style>
+/* Jelly Cut: 3 Runden (Hälfte 50 %, Drittel 33 %, Viertel 25 %). Gerade Linie durch das Jelly ziehen, beim Loslassen wird geschnitten.
+   Genauigkeit pro Runde = 100 % * (1 - |Anteil - Ziel| / Ziel), gewertet wird das Stück, das näher am Ziel liegt (gelb).
+   Ergebnis = Durchschnitt der 3 Runden (Original: 28,1 % beim Drittel -> 84,4 %).
+   Maße (390 x 844): Titel 204–299 px, Ziel-% bei 324 px, Jelly-Mitte (195 | 503), etwa 290 x 270 px, Schatten bei ~700 px. */
+:root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: light; }
+html, body { height: 100%; }
+body { background: #ff4f86; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden; margin: 0;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(60, 0, 30, 0.45); color: #fff4e6; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(30, 6, 20, 0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.sum { background: #2a1426; border-radius: 16px; padding: 14px 18px; min-width: 62vw; max-width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+.sum div { display: flex; justify-content: space-between; font-size: 15px; padding: 7px 2px; border-bottom: 1px solid rgba(255,255,255,0.12); font-variant-numeric: tabular-nums; }
+.sum div span:last-child { color: #ffd23f; }
+.sum div.avg { border: 0; font-size: 15px; padding-top: 12px; align-items: baseline; }
+.sum div.avg span:last-child { font-size: 26px; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<canvas id="cv"></canvas>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="result" id="result" hidden>
+  <div class="sum" id="sum"></div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  var ROUNDS = [{ t: 0.5, l1: "Schneide es in", l2: "zwei Hälften!", p: "50%", n: "Hälfte" },
+                { t: 1 / 3, l1: "Schneide ein", l2: "Drittel ab!", p: "33%", n: "Drittel" },
+                { t: 0.25, l1: "Schneide ein", l2: "Viertel ab!", p: "25%", n: "Viertel" }];
+  var CX = 195, CY = 503, RAD = 128, MIN_DRAG = 30;
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d"), Ws, Hs, S, dpr, OY;
+  function layout() { dpr = Math.min(3, window.devicePixelRatio || 1); Ws = window.innerWidth; Hs = window.innerHeight; S = Ws / 390; OY = 0;
+    cv.width = Math.round(Ws * dpr); cv.height = Math.round(Hs * dpr); }
+  window.addEventListener("resize", layout); layout();
+  // Weltkoordinaten: x in u (390 breit), y als 844er-Pixel, skaliert auf die Bildhöhe
+  function sx(x) { return x * S; } function sy(y) { return y / 844 * Hs; }
+  function wx(px) { return px / S; } function wy(py) { return py / Hs * 844; }
+
+  var state, round, shape, pieces, scores, drag, anim, best = 0, gen = 0, conf = [], introT = 0;
+  try { best = parseFloat(localStorage.getItem("jellycut-best")) || 0; } catch (e) {}
+  var bestEl = document.getElementById("best");
+  function showBest() { bestEl.innerHTML = "<b>Best</b>" + (best ? best.toFixed(2) + " %" : "--"); }
+  showBest();
+
+  // Zufällige Jelly-Form: weicher Klecks, eckiger Klecks oder Stern mit runden Spitzen, Rand leicht gewellt
+  function makeShape() {
+    var kind = Math.floor(Math.random() * 3), N = 260, pts = [], harm = [];
+    for (var k = 2; k <= 5; k++) harm.push({ k: k, a: (Math.random() * 0.09) / (k * 0.5), p: Math.random() * 7 });
+    var star = kind === 2 ? 5 : kind === 1 ? 4 : 0, sa = kind === 2 ? 0.26 : 0.11, sp = Math.random() * 7;
+    var wob = [{ k: 9 + Math.floor(Math.random() * 5), a: 0.012 + Math.random() * 0.02, p: Math.random() * 7 }, { k: 15 + Math.floor(Math.random() * 6), a: 0.006 + Math.random() * 0.012, p: Math.random() * 7 }];
+    for (var i = 0; i < N; i++) {
+      var th = i / N * Math.PI * 2, r = 1;
+      harm.forEach(function (h) { r += h.a * Math.cos(h.k * th + h.p); });
+      if (star) { var c = Math.cos(star * th + sp); r += sa * (c > 0 ? Math.pow(c, 2) : -0.55 * Math.pow(-c, 1.4)); }
+      wob.forEach(function (h) { r += h.a * Math.cos(h.k * th + h.p); });
+      pts.push([Math.cos(th) * r, Math.sin(th) * r * 0.95]);
+    }
+    // auf gleiche Größe bringen (Breite ~290 px)
+    var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    pts.forEach(function (p) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+    var sc = Math.min(286 / (x1 - x0), 268 / (y1 - y0)), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    return pts.map(function (p) { return [CX + (p[0] - mx) * sc, CY + (p[1] - my) * sc]; });
+  }
+  function area(P) { var a = 0; for (var i = 0, n = P.length; i < n; i++) { var p = P[i], q = P[(i + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+  function centroid(P) { var a = 0, x = 0, y = 0; for (var i = 0, n = P.length; i < n; i++) { var p = P[i], q = P[(i + 1) % n], c = p[0] * q[1] - q[0] * p[1]; a += c; x += (p[0] + q[0]) * c; y += (p[1] + q[1]) * c; } return a ? [x / (3 * a), y / (3 * a)] : P[0]; }
+  // Polygon an Gerade teilen (Halbebene behalten); Fläche stimmt auch bei nicht-konvexen Formen
+  function clip(P, a, b, side) {
+    var nx = -(b[1] - a[1]), ny = b[0] - a[0], out = [];
+    function d(p) { return side * ((p[0] - a[0]) * nx + (p[1] - a[1]) * ny); }
+    for (var i = 0, n = P.length; i < n; i++) {
+      var p = P[i], q = P[(i + 1) % n], dp = d(p), dq = d(q);
+      if (dp >= 0) out.push(p);
+      if ((dp >= 0) !== (dq >= 0)) { var t = dp / (dp - dq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); }
+    }
+    return out;
+  }
+  function reset() {
+    gen++; state = "intro"; round = 0; scores = []; pieces = null; drag = null; anim = 0; conf = [];
+    shape = makeShape(); document.getElementById("result").hidden = true;
+  }
+  function nextRound() { round++; shape = makeShape(); pieces = null; state = "play"; }
+  function cut(a, b) {
+    var A = clip(shape, a, b, 1), B = clip(shape, a, b, -1), ta = Math.abs(area(shape));
+    if (A.length < 3 || B.length < 3) return false;
+    var fa = Math.abs(area(A)) / ta, fb = 1 - fa;
+    if (fa < 0.004 || fb < 0.004) return false;
+    var tgt = ROUNDS[round].t, ea = Math.abs(fa - tgt), eb = Math.abs(fb - tgt);
+    var pick = ea <= eb ? fa : fb, acc = Math.max(0, 100 * (1 - Math.abs(pick - tgt) / tgt));
+    scores.push(acc);
+    var len = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / len, ny = (b[0] - a[0]) / len;
+    pieces = [{ P: A, f: fa, dir: 1, yel: ea <= eb }, { P: B, f: fb, dir: -1, yel: ea > eb }];
+    pieces.forEach(function (pc) { pc.c = centroid(pc.P); pc.nx = nx * pc.dir; pc.ny = ny * pc.dir; });
+    pieces.line = [a, b]; state = "cut"; anim = 0;
+    for (var i = 0; i < 40; i++) { var t = Math.random(), px = a[0] + (b[0] - a[0]) * t, py = a[1] + (b[1] - a[1]) * t;
+      if (Math.hypot(px - CX, py - CY) < 150) conf.push({ x: px, y: py, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 260, c: ["#ffd23f", "#fff", "#7af0c6", "#ff9ec4"][i % 4], l: 1 }); }
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+    return true;
+  }
+  function finish() {
+    state = "done";
+    var avg = scores.reduce(function (s, v) { return s + v; }, 0) / scores.length, r2 = Math.round(avg * 100) / 100;
+    var rec = r2 > best;
+    if (rec) { best = r2; try { localStorage.setItem("jellycut-best", String(best)); } catch (e) {} showBest(); }
+    var h = ""; ROUNDS.forEach(function (R, i) { h += "<div><span>" + R.n + "</span><span>" + scores[i].toFixed(1) + "%</span></div>"; });
+    h += '<div class="avg"><span>Schnitt</span><span>' + r2.toFixed(2) + "%</span></div>";
+    document.getElementById("sum").innerHTML = h;
+    document.getElementById("rec").hidden = !rec;
+    document.getElementById("result").hidden = false;
+  }
+  function update(dt) {
+    introT += dt;
+    if (state === "cut") {
+      anim += dt;
+      if (anim > 2.0) { if (round < 2) nextRound(); else finish(); }
+    }
+    for (var i = conf.length - 1; i >= 0; i--) { var c = conf[i]; c.vy += 500 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.l -= dt * 0.8; if (c.l <= 0) conf.splice(i, 1); }
+  }
+  function path(P, ox, oy, rot, c) {
+    ctx.beginPath();
+    for (var i = 0; i < P.length; i++) {
+      var x = P[i][0] - c[0], y = P[i][1] - c[1], cs = Math.cos(rot), sn = Math.sin(rot);
+      var X = c[0] + ox + x * cs - y * sn, Y = c[1] + oy + x * sn + y * cs;
+      if (i) ctx.lineTo(sx(X), sy(Y)); else ctx.moveTo(sx(X), sy(Y));
+    }
+    ctx.closePath();
+  }
+  function jelly(P, ox, oy, rot, c, yel) {
+    var g = ctx.createLinearGradient(0, sy(CY - 140), 0, sy(CY + 140));
+    if (yel) { g.addColorStop(0, "#ffd84a"); g.addColorStop(1, "#ffb21c"); } else { g.addColorStop(0, "#31eba3"); g.addColorStop(1, "#16c584"); }
+    path(P, ox, oy, rot, c); ctx.fillStyle = g; ctx.fill();
+    ctx.lineJoin = "round"; ctx.lineWidth = sx(3.2); ctx.strokeStyle = yel ? "#d98a00" : "#0f8a5c"; ctx.stroke();
+  }
+  function shine(P) {
+    ctx.save(); path(P, 0, 0, 0, [0, 0]); ctx.clip();
+    var c = centroid(P), x0 = 1e9, y0 = 1e9; P.forEach(function (p) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); });
+    ctx.fillStyle = "rgba(255,255,255,0.32)"; ctx.beginPath();
+    ctx.ellipse(sx((x0 + c[0]) / 2 + 6), sy((y0 + c[1]) / 2 + 2), sx(46), sx(26), -0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var bg = ctx.createLinearGradient(0, 0, 0, Hs); bg.addColorStop(0, "#ff62aa"); bg.addColorStop(0.45, "#ff5a9c"); bg.addColorStop(1, "#ff2a5e");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, Ws, Hs);
+    ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.beginPath(); ctx.roundRect(0, sy(176), Ws, Hs, sx(22)); ctx.fill();
+    var font = getComputedStyle(document.body).fontFamily, R = ROUNDS[round];
+    var tAlpha = state === "cut" ? Math.max(0, 1 - anim / 0.25) : 1;
+    if (state === "cut" && anim > 1.6 && round < 2) tAlpha = 0;
+    ctx.globalAlpha = tAlpha; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "800 " + Math.round(sx(38)) + "px " + font;
+    ctx.lineWidth = sx(5); ctx.strokeStyle = "rgba(150,10,60,0.35)"; ctx.lineJoin = "round";
+    [[R.l1, 228], [R.l2, 274]].forEach(function (l) { ctx.strokeText(l[0], Ws / 2, sy(l[1])); ctx.fillStyle = "#fff"; ctx.fillText(l[0], Ws / 2, sy(l[1])); });
+    ctx.font = "800 " + Math.round(sx(22)) + "px " + font; ctx.fillStyle = "#ffd23f"; ctx.fillText(R.p, Ws / 2, sy(324));
+    ctx.globalAlpha = 1;
+    // Schatten
+    ctx.fillStyle = "rgba(150,0,50,0.28)"; ctx.beginPath(); ctx.ellipse(Ws / 2, sy(700), sx(122), sx(15), 0, 0, Math.PI * 2); ctx.fill();
+    if (!pieces) { jelly(shape, 0, 0, 0, [CX, CY], false); shine(shape); }
+    else {
+      var k = Math.min(1, anim / 0.28), e = 1 - Math.pow(1 - k, 3), fade = state === "cut" && anim > 1.65 ? Math.max(0, 1 - (anim - 1.65) / 0.3) : 1;
+      ctx.globalAlpha = fade;
+      pieces.forEach(function (pc) { jelly(pc.P, pc.nx * 16 * e, pc.ny * 16 * e, pc.dir * 0.05 * e, pc.c, pc.yel); });
+      ctx.font = "800 " + Math.round(sx(19)) + "px " + font; ctx.lineWidth = sx(4); ctx.strokeStyle = "rgba(0,60,40,0.55)";
+      pieces.forEach(function (pc) { var t = (pc.f * 100).toFixed(1) + "%", x = sx(pc.c[0] + pc.nx * 16 * e), y = sy(pc.c[1] + pc.ny * 16 * e);
+        ctx.strokeText(t, x, y); ctx.fillStyle = "#fff"; ctx.fillText(t, x, y); });
+      if (anim < 0.35) { var L = pieces.line, dx = L[1][0] - L[0][0], dy = L[1][1] - L[0][1], m = 900 / Math.hypot(dx, dy);
+        ctx.globalAlpha = 1 - anim / 0.35; ctx.strokeStyle = "#ffe3ef"; ctx.lineWidth = sx(2.5); ctx.beginPath();
+        ctx.moveTo(sx(L[0][0] - dx * m), sy(L[0][1] - dy * m)); ctx.lineTo(sx(L[0][0] + dx * m), sy(L[0][1] + dy * m)); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    conf.forEach(function (c) { ctx.globalAlpha = Math.max(0, c.l); ctx.fillStyle = c.c; ctx.fillRect(sx(c.x), sy(c.y), sx(3), sx(5)); });
+    ctx.globalAlpha = 1;
+    // gestrichelte Schnittlinie (unendlich lang), Punkte am Start und am Finger
+    if (drag && drag.b) {
+      var a = drag.a, b = drag.b, ddx = b[0] - a[0], ddy = b[1] - a[1], ll = Math.hypot(ddx, ddy);
+      if (ll > 2) { var mm = 900 / ll; ctx.setLineDash([sx(7), sx(6)]); ctx.strokeStyle = "#fff"; ctx.lineWidth = sx(2.2);
+        ctx.beginPath(); ctx.moveTo(sx(a[0] - ddx * mm), sy(a[1] - ddy * mm)); ctx.lineTo(sx(a[0] + ddx * mm), sy(a[1] + ddy * mm)); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.fillStyle = "#fff"; [a, b].forEach(function (p) { ctx.beginPath(); ctx.arc(sx(p[0]), sy(p[1]), sx(5), 0, 7); ctx.fill(); });
+    }
+    if (state === "intro") {
+      ctx.fillStyle = "rgba(40,10,25,0.62)"; ctx.beginPath(); ctx.roundRect(0, sy(176), Ws, Hs, sx(22)); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = "800 " + Math.round(sx(25)) + "px " + font;
+      ctx.fillText("Ziehe durch das", Ws / 2, sy(470)); ctx.fillText("Jelly, um es zu", Ws / 2, sy(500)); ctx.fillText("schneiden.", Ws / 2, sy(530));
+      var pu = 0.5 + 0.5 * Math.sin(introT * 4);
+      ctx.fillStyle = "rgba(255,255,255," + (0.35 + 0.5 * pu) + ")"; ctx.beginPath(); ctx.arc(Ws / 2, sy(686), sx(18 + 3 * pu), 0, 7); ctx.fill();
+    }
+  }
+  var last = 0;
+  function frame(n) { requestAnimationFrame(frame); var dt = Math.min(0.05, (n - last) / 1000); last = n; update(dt); draw(); }
+  function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".result") || e.target.closest("#trx")); }
+  document.addEventListener("pointerdown", function (e) {
+    if (ui(e)) return; e.preventDefault();
+    if (state === "intro") { state = "play"; }
+    if (state !== "play") return;
+    drag = { id: e.pointerId, a: [wx(e.clientX), wy(e.clientY)], b: null };
+  });
+  document.addEventListener("pointermove", function (e) { if (drag && drag.id === e.pointerId) drag.b = [wx(e.clientX), wy(e.clientY)]; });
+  function up(e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var d = drag; drag = null;
+    if (state !== "play" || !d.b) return;
+    if (Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) < MIN_DRAG) return;
+    cut(d.a, d.b);
+  }
+  document.addEventListener("pointerup", up); document.addEventListener("pointercancel", function () { drag = null; });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap(document.getElementById("reset"), reset);
+  bindTap(document.getElementById("ok"), reset);
+  reset();
+  requestAnimationFrame(function (n) { last = n; frame(n); });
+  window.__jc = { get s() { return { state: state, round: round, scores: scores.slice() }; }, cut: function (a, b) { if (state === "intro") state = "play"; return state === "play" && cut(a, b); } };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>

@@ -84,6 +84,8 @@ h1{font-size:28px;margin:8px 0 20px}
   <a href="siebensekunden.html" data-g="siebensekunden">7 Sekunden<small>Timer so nah wie möglich bei 7,00 s stoppen</small></a>
   <a href="tilted.html" data-g="tilted">Tilted<small>Links/rechts tippen, Ball auf der Wippe halten</small></a>
   <a href="shotclock.html" data-g="shotclock">Shot Clock<small>Tippen, Ball springt Richtung Korb, bevor die Uhr abläuft</small></a>
+  <a href="jellycut.html" data-g="jellycut">Jelly Cut<small>Gerade Linie ziehen, Hälfte / Drittel / Viertel abschneiden</small></a>
+  <a href="quickmaths.html" data-g="quickmaths">Quick Maths<small>5 Aufgaben, richtige Antwort tippen, Fehler +2 s</small></a>
   </div>
   <div class="sec" id="sec-own" hidden>
     <h2 style="--c:#9b8cff">Memory</h2>
@@ -151,7 +153,7 @@ h1{font-size:28px;margin:8px 0 20px}
   document.getElementById("home").addEventListener("click", function (e) { e.preventDefault(); close(); });
 
   // Highscores aus einem Code übernehmen. Zeiten (Zahlenraster, Dice Roll, React, Time's Up): kleiner ist besser, sonst größer.
-  var LOWER = /^(e-ampel-best|siebensek-best|zahlenfolge-best|speedgolf-best|zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best|timesup-best|zrz-best)/;
+  var LOWER = /^(quickmaths-best|e-ampel-best|siebensek-best|zahlenfolge-best|speedgolf-best|zr-best|zr2-best|zr9-best|dr-total-|dr-avg-|react-best|timesup-best|zrz-best)/;
   var imp = document.getElementById("imp"), impCode = document.getElementById("imp-code"), impMsg = document.getElementById("imp-msg");
   document.getElementById("imp-open").addEventListener("click", function () { impCode.value = ""; impMsg.textContent = ""; imp.hidden = false; });
   document.getElementById("imp-close").addEventListener("click", function () { imp.hidden = true; });
