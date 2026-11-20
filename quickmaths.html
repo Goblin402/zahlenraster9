@@ -30,6 +30,12 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
 .best b { opacity: 0.6; margin-right: 0.35em; }
 .bar button { cursor: pointer; }
 .bar button:focus-visible { outline: 2px solid #1d1a3f; outline-offset: 2px; }
+/* Rechenart-Box oben links: leer = alle gemischt, sonst nur dieses Zeichen (eigener Highscore) */
+.fast { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); z-index: 6;
+  width: 30px; height: 30px; border: 2px solid #1d1a3f; border-radius: 8px; background: transparent; color: #1d1a3f; font: inherit; font-size: 20px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; padding: 0 0 2px; cursor: pointer; opacity: 0.55; }
+.fast.on { background: #1d1a3f; color: #fff4e6; opacity: 1; }
+.fast:focus-visible { outline: 2px solid #1d1a3f; outline-offset: 2px; }
 .clock { position: absolute; left: 0; right: 0; top: 20%; text-align: center; font-size: min(5vw, 20px); opacity: 0.55; font-variant-numeric: tabular-nums; }
 .dots { position: absolute; left: 0; right: 0; top: calc(278 / 844 * 100%); transform: translateY(-50%); display: flex; justify-content: center; gap: calc(7 / 390 * 100vw); }
 .dots i { width: calc(9 / 390 * 100vw); max-width: 10px; aspect-ratio: 1; border-radius: 50%; background: #d6ccc2; }
@@ -66,6 +72,7 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
 .result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
 .result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 </style>
+<button class="fast" id="fast" type="button" aria-label="Rechenart: alle"></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
   <div class="best" id="best"><b>Best</b>--</div>
@@ -88,14 +95,20 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
   var $ = function (id) { return document.getElementById(id); };
   var btns = [].slice.call($("btns").children);
   var state = "intro", tasks = [], idx = 0, t0 = 0, extra = 0, best = 0, gen = 0, raf = 0, lock = false;
-  try { best = parseFloat(localStorage.getItem("quickmaths-best")) || 0; } catch (e) {}
+  // Rechenart: "" = alle, sonst nur + − × ÷ (jeweils eigener Highscore)
+  var MODES = ["", "+", "−", "×", "÷"], MKEY = { "": "", "+": "-plus", "−": "-minus", "×": "-mal", "÷": "-geteilt" }, mode = "";
+  try { mode = localStorage.getItem("quickmaths-op") || ""; if (MODES.indexOf(mode) < 0) mode = ""; } catch (e) {}
+  function key() { return "quickmaths-best" + MKEY[mode]; }
+  function loadBest() { best = 0; try { best = parseFloat(localStorage.getItem(key())) || 0; } catch (e) {} }
+  loadBest();
   function showBest() { $("best").innerHTML = "<b>Best</b>" + (best ? best.toFixed(2) + "s" : "--"); }
   showBest();
   function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
   // Aufgaben wie im Original: eine kleine Zahl (1–9) mit einer kleinen oder zweistelligen, Minus nie negativ, Mal nur klein x klein
   function makeTask() {
-    var op = ["+", "+", "−", "−", "×"][ri(0, 4)], a, b, r;
+    var op = mode || ["+", "+", "−", "−", "×"][ri(0, 4)], a, b, r;
     if (op === "×") { a = ri(2, 9); b = ri(2, 9); r = a * b; }
+    else if (op === "÷") { b = ri(2, 9); r = ri(2, 9); a = b * r; }
     else if (op === "+") { var big = Math.random() < 0.5 ? ri(10, 89) : ri(1, 9); var sm = ri(1, 9); if (Math.random() < 0.5) { a = big; b = sm; } else { a = sm; b = big; } r = a + b; }
     else { a = Math.random() < 0.6 ? ri(11, 99) : ri(5, 9); b = ri(1, Math.min(9, a - 1)); r = a - b; }
     // falsche Antworten dicht dran (±1 bis ±8), nie negativ, alle verschieden
@@ -117,7 +130,7 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
   function tick() { if (state !== "run") return; $("clock").textContent = Math.floor(now()) + "s"; raf = requestAnimationFrame(tick); }
   function reset() {
     gen++; cancelAnimationFrame(raf); state = "intro"; idx = 0; extra = 0; lock = false;
-    tasks = []; for (var i = 0; i < N; i++) tasks.push(makeTask());
+    tasks = []; while (tasks.length < N) { var tk = makeTask(); if (!tasks.some(function (x) { return x.text === tk.text; })) tasks.push(tk); }
     $("intro").hidden = false; $("result").hidden = true; $("clock").textContent = "0s"; render();
   }
   function start() { state = "run"; $("intro").hidden = true; t0 = performance.now(); extra = 0; render(); tick(); }
@@ -126,7 +139,7 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
     var t = Math.round(now() * 100) / 100;
     $("clock").textContent = t.toFixed(2) + "s";
     var rec = !best || t < best;
-    if (rec) { best = t; try { localStorage.setItem("quickmaths-best", String(best)); } catch (e) {} showBest(); }
+    if (rec) { best = t; try { localStorage.setItem(key(), String(best)); } catch (e) {} showBest(); }
     $("rec").hidden = !rec; $("pts").textContent = t.toFixed(2) + "s";
     var g = gen; setTimeout(function () { if (g === gen) $("result").hidden = false; }, 400);
   }
@@ -149,6 +162,14 @@ body { background: #f0e4d5; color: #1d1a3f; font-family: var(--font); font-weigh
   $("intro").addEventListener("pointerdown", function (e) { e.preventDefault(); if (state === "intro") start(); });
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
   bindTap($("reset"), reset); bindTap($("ok"), reset);
+  function showMode() { var f = $("fast"); f.textContent = mode; f.className = mode ? "fast on" : "fast"; f.setAttribute("aria-label", "Rechenart: " + (mode || "alle")); }
+  showMode();
+  bindTap($("fast"), function () {
+    if (state === "run") return;
+    mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+    try { localStorage.setItem("quickmaths-op", mode); } catch (e) {}
+    showMode(); loadBest(); showBest(); reset();
+  });
   reset();
   window.__qm = { get s() { return { state: state, idx: idx, task: tasks[idx], t: now() }; } };
 })();
