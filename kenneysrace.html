@@ -22,7 +22,9 @@
    Aus 5 Aufnahmen vermessen (Bodenbewegung entzerrt und zu einer Draufsicht zusammengesetzt):
    Strecke = Raster mit 6 Ecken (5 links, 1 rechts), Kurvenradius 1 Feld, Fahrbahn 0,91 Feld, zwischen den Banden 1,24 Feld.
    Kamera dreht nie mit: um 45° zum Raster gedreht, 26,8° geneigt, Blickwinkel 50°, 2,18 Felder hoch, 3,6 Felder hinter dem Auto.
-   Tempo: Geraden bis ~3,0 Felder/s, in Drifts ~1,5; eine Runde ~10,7 s (bestes Original: 21,48 s für 2 Runden). */
+   Tempo: Geraden bis ~3,1 Felder/s, kräftiger Antritt (0 -> 1,6 in ~0,6 s), in Drifts ~1,6–2,2; bestes Original: 21,48 s für 2 Runden.
+   Drift (Auto-Ausrichtung gegen Fahrtrichtung Bild für Bild verglichen): Auto dreht beim Halten ~250 °/s, die Fahrtrichtung zieht
+   nur langsam nach (Rutschwinkel oft 60–90°), dabei geht wenig Tempo verloren. */
 :root { --font: "Syne", "Arial Black", system-ui, sans-serif; color-scheme: dark; }
 html, body { height: 100%; margin: 0; }
 body { background: #3c8c62; color: #fff; font-family: var(--font); font-weight: 800; position: relative; overflow: hidden;
@@ -77,7 +79,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
   var CORNERS = [[6, 6], [6, 0], [3, 0], [3, 3], [0, 3], [0, 6]]; // Fahrtrichtung: rechts hoch, oben nach links, ...
   var RAD = 1.0, ROAD = 0.455, KERB = 0.53, CORR = 0.62, CAR_R = 0.11, LAPS = 2;
   var FINISH_Z = 4.35, START = { x: 6, z: 4.02 }; // Auto steht gleich hinter dem Bogen
-  var VMAX = 3.4, ACC_TAU = 1.35, STEER = 3.4, GRIP = 5.0, DRIFT_LOSS = 2.6, WALL_KEEP = 0.82;
+  var VMAX = 3.1, ACC_TAU = 0.9, STEER = 4.4, GRIP = 1.8, DRIFT_LOSS = 1.0, WALL_KEEP = 0.7;
   // Mittellinie mit Kurvenbögen erzeugen
   function buildPath() {
     var n = CORNERS.length, pts = [];
@@ -277,7 +279,8 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
     while (slip > Math.PI) slip -= 2 * Math.PI; while (slip < -Math.PI) slip += 2 * Math.PI;
     var nd = vdir + slip * (1 - Math.exp(-GRIP * dt));
     var acc = state === "run" || state === "done" ? (state === "done" ? -1.2 * sp : VMAX / ACC_TAU * (1 - sp / VMAX)) : 0;
-    sp = Math.max(0, sp + acc * dt - DRIFT_LOSS * Math.abs(Math.sin(slip)) * sp * dt);
+    var sl = Math.abs(slip) > Math.PI / 2 ? 1 : Math.abs(Math.sin(slip));
+    sp = Math.max(0, sp + acc * dt - DRIFT_LOSS * sl * sp * dt);
     vx = Math.cos(nd) * sp; vz = Math.sin(nd) * sp;
     var ox = x, oz = z;
     x += vx * dt; z += vz * dt;
