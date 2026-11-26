@@ -304,8 +304,9 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
     state = "done"; var t = Math.round(tNow * 100) / 100;
     var rec = !best || t < best;
     recSample(); recSample(true);
-    if (rec) { best = t; try { localStorage.setItem("kenneysrace-best", String(best)); } catch (e) {} showBest();
-      // Rekordfahrt als Geist speichern (gilt für alle Modi)
+    if (rec) { best = t; try { localStorage.setItem("kenneysrace-best", String(best)); } catch (e) {} showBest(); }
+    // Geist = schnellste aufgezeichnete Fahrt (auch wenn sie den alten, nicht aufgezeichneten Rekord nicht schlägt)
+    if (!recGhost || t < recGhost.t) {
       recGhost = { lap1: lap1T === null ? 0 : +lap1T.toFixed(3), t: t, p: recBuf.slice() };
       try { localStorage.setItem("kenneysrace-ghost-rec", JSON.stringify(recGhost)); } catch (e) {}
       updMode(); }
