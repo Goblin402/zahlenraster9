@@ -69,6 +69,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
 </style>
 <canvas id="gl"></canvas>
 <div class="hud"><div class="t" id="tm">00:00</div><div class="r" id="rd">Runde 1/2</div><div class="sd" id="sd" hidden></div></div>
+<div class="mt" id="mt"></div>
 <button class="gb" id="gb" type="button" aria-label="Geistermodus" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="#fff" d="M12 2a8 8 0 0 0-8 8v11.5l2.7-2 2.6 2 2.7-2 2.7 2 2.6-2 2.7 2V10a8 8 0 0 0-8-8z"/><circle cx="9" cy="10" r="1.6" fill="#2a3a33"/><circle cx="15" cy="10" r="1.6" fill="#2a3a33"/></svg></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
@@ -399,6 +400,9 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
     if (state === "run") return;
     mode = (mode + 1) % 3; try { localStorage.setItem("kenneysrace-ghost", String(mode)); } catch (e) {}
     updMode(); touches = {}; recount(); reset(); showGhost();
+    // kurzer Hinweis, welcher Modus jetzt an ist
+    var el = $("mt"); el.textContent = mode === 0 ? "Normal" : mode === 1 ? "Bot " + GHOST.t.toFixed(2) + "s" : "Bestzeit " + (recGhost ? recGhost.t.toFixed(2) + "s" : "--");
+    el.className = "mt on"; clearTimeout(cycleMode.tm); cycleMode.tm = setTimeout(function () { el.className = "mt"; }, 1100);
   }
   bindTap($("gb"), cycleMode);
   showGhost();
