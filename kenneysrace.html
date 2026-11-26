@@ -37,7 +37,10 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
 /* Geistermodus: unsichtbarer Knopf oben links, nur eingeschaltet sichtbar */
 .gb { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); z-index: 6; width: 48px; height: 48px;
   border: 0; border-radius: 14px; background: rgba(10, 30, 20, 0.55); padding: 0; cursor: pointer; opacity: 0; display: flex; align-items: center; justify-content: center; }
-.gb.on { opacity: 0; } /* Knopf bleibt immer unsichtbar, nur die Ecke ist antippbar */
+.gb.on { opacity: 0; }
+.gb { pointer-events: none; }
+.mt { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 6; background: rgba(10, 30, 20, 0.75); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 15px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+.mt.on { opacity: 1; transition: none; } /* Knopf bleibt immer unsichtbar, nur die Ecke ist antippbar */
 .gb:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .gb svg { width: 30px; height: 30px; }
 .hud .sp, .hud .sd { font-size: min(4vw, 17px); margin-top: 6px; font-variant-numeric: tabular-nums; -webkit-text-stroke: 1px rgba(20, 30, 40, 0.5); paint-order: stroke fill; }
@@ -66,6 +69,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
 </style>
 <canvas id="gl"></canvas>
 <div class="hud"><div class="t" id="tm">00:00</div><div class="r" id="rd">Runde 1/2</div><div class="sd" id="sd" hidden></div><div class="sp" id="sp" hidden>0 km/h</div></div>
+<div class="mt" id="mt"></div>
 <button class="gb" id="gb" type="button" aria-label="Geistermodus" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="#fff" d="M12 2a8 8 0 0 0-8 8v11.5l2.7-2 2.6 2 2.7-2 2.7 2 2.6-2 2.7 2V10a8 8 0 0 0-8-8z"/><circle cx="9" cy="10" r="1.6" fill="#2a3a33"/><circle cx="15" cy="10" r="1.6" fill="#2a3a33"/></svg></button>
 <div class="bar">
   <button id="reset" type="button">&#8635; Reset</button>
@@ -250,7 +254,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
   ghost.traverse(function (o) { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = o.material.opacity * 0.22; o.material.depthWrite = false; } });
   ghost.visible = false; scene.add(ghost);
   function ghostAt(t) {
-    var n = GHOST.p.length / 3, f = Math.max(0, Math.min(n - 1.001, t * 60)), i = Math.floor(f), k = f - i, a = i * 3, b = (i + 1) * 3, P = GHOST.p;
+    var GG = curGhost(), n = GG.p.length / 3, f = Math.max(0, Math.min(n - 1.001, t * 60)), i = Math.floor(f), k = f - i, a = i * 3, b = (i + 1) * 3, P = GG.p;
     var dh = P[b + 2] - P[a + 2]; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
     ghost.position.set(P[a] + (P[b] - P[a]) * k, 0, P[a + 1] + (P[b + 1] - P[a + 1]) * k); ghost.rotation.y = -(P[a + 2] + dh * k);
   }
@@ -268,8 +272,13 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
   }
 
   // ---------- Spielzustand ----------
-  var ghostOn = false, lap1T = null;
-  try { ghostOn = localStorage.getItem("kenneysrace-ghost") === "1"; } catch (e) {}
+  // Modi: 0 = normal, 1 = Geist = Bot-Bestzeit, 2 = Geist = eigene Rekordfahrt
+  var mode = 0, ghostOn = false, lap1T = null, recGhost = null, recBuf = [];
+  try { mode = parseInt(localStorage.getItem("kenneysrace-ghost"), 10) || 0; if (mode < 0 || mode > 2) mode = 0; } catch (e) {}
+  try { recGhost = JSON.parse(localStorage.getItem("kenneysrace-ghost-rec") || "null"); if (!recGhost || !recGhost.p || recGhost.p.length < 6) recGhost = null; } catch (e) { recGhost = null; }
+  function curGhost() { return mode === 1 ? GHOST : mode === 2 ? recGhost : null; }
+  function updMode() { ghostOn = !!curGhost(); }
+  updMode();
   var state, x, z, head, vx, vz, prog, idx, tStart, tNow, lap, fx, fz, best = 0, gen = 0, steerL = 0, steerR = 0, lastSide = 0;
   try { best = parseFloat(localStorage.getItem("kenneysrace-best")) || 0; } catch (e) {}
   var $ = function (id) { return document.getElementById(id); };
@@ -278,7 +287,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
   function reset() {
     gen++; state = "intro"; x = START.x; z = START.z; head = -Math.PI / 2; vx = 0; vz = 0; idx = START_I; prog = 0; lap = 1; tNow = 0;
     fx = x; fz = z; steerL = steerR = 0; skN = 0; skGeo.setDrawRange(0, 0); lastMarks = null;
-    lap1T = null; $("intro").hidden = false; $("result").hidden = true; $("gres").hidden = true; hud();
+    lap1T = null; recBuf = []; $("intro").hidden = false; $("result").hidden = true; $("gres").hidden = true; hud();
   }
   function hud() {
     var s = Math.floor(tNow); $("tm").textContent = ("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2);
@@ -288,7 +297,7 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
     $("sp").hidden = !live; $("sd").hidden = !live || lap1T === null;
     if (ghostOn) {
       $("sp").textContent = Math.round(Math.hypot(vx, vz) * 36) + " km/h";
-      if (lap1T !== null) { var d = Math.round((lap1T - GHOST.lap1) * 100) / 100; $("sd").textContent = (d > 0 ? "+" : d < 0 ? "−" : "±") + Math.abs(d).toFixed(2) + "s"; $("sd").className = "sd " + (d > 0 ? "up" : d < 0 ? "down" : ""); }
+      if (lap1T !== null) { var d = Math.round((lap1T - curGhost().lap1) * 100) / 100; $("sd").textContent = (d > 0 ? "+" : d < 0 ? "−" : "±") + Math.abs(d).toFixed(2) + "s"; $("sd").className = "sd " + (d > 0 ? "up" : d < 0 ? "down" : ""); }
     }
   }
   // Strecke bis zur Ziellinie: Start liegt kurz hinter dem Bogen, also fast eine ganze Runde
@@ -296,7 +305,12 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
   function finish() {
     state = "done"; var t = Math.round(tNow * 100) / 100;
     var rec = !best || t < best;
-    if (rec) { best = t; try { localStorage.setItem("kenneysrace-best", String(best)); } catch (e) {} showBest(); }
+    recSample(); recSample(true);
+    if (rec) { best = t; try { localStorage.setItem("kenneysrace-best", String(best)); } catch (e) {} showBest();
+      // Rekordfahrt als Geist speichern (gilt für alle Modi)
+      recGhost = { lap1: lap1T === null ? 0 : +lap1T.toFixed(3), t: t, p: recBuf.slice() };
+      try { localStorage.setItem("kenneysrace-ghost-rec", JSON.stringify(recGhost)); } catch (e) {}
+      updMode(); }
     $("rec").hidden = !rec; $("pts").textContent = t.toFixed(2) + "s";
     hud();
     var g = gen; setTimeout(function () { if (g === gen) $("result").hidden = false; }, 900);
@@ -358,13 +372,20 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
     if (state === "run" || state === "done") {
       if (state === "run") { tNow += dt; hud(); }
       var n = Math.ceil(dt / 0.005); for (var j = 0; j < n; j++) step(dt / n);
+      if (state === "run") recSample();
     }
     place(dt); renderer.render(scene, camera);
+  }
+  // Fahrt mitschreiben (60 Punkte pro Sekunde: x, z, Richtung) für den Rekord-Geist
+  function recSample(force) {
+    while (recBuf.length / 3 <= tNow * 60 || force) { recBuf.push(+x.toFixed(3), +z.toFixed(3), +head.toFixed(3)); if (force) break; }
   }
   function ui(e) { return e.target.closest && (e.target.closest(".bar") || e.target.closest(".gb") || e.target.closest(".result") || e.target.closest("#trx")); }
   var touches = {};
   document.addEventListener("pointerdown", function (e) {
     if (ui(e)) return; e.preventDefault();
+    // Ecke oben links: vor dem Start nur Modus wechseln, kein Lauf starten
+    if (state === "intro" && e.clientX < 90 && e.clientY < 140) { cycleMode(); return; }
     if (state === "intro") { state = "run"; $("intro").hidden = true; tNow = 0; }
     if (state !== "run") return;
     var side = e.clientX < window.innerWidth / 2 ? -1 : 1; touches[e.pointerId] = side; lastSide = side; recount();
@@ -375,7 +396,15 @@ canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: bl
   function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
   bindTap($("reset"), function () { touches = {}; recount(); reset(); });
   function showGhost() { $("gb").className = ghostOn ? "gb on" : "gb"; $("gb").setAttribute("aria-pressed", ghostOn ? "true" : "false"); hud(); }
-  bindTap($("gb"), function () { ghostOn = !ghostOn; try { localStorage.setItem("kenneysrace-ghost", ghostOn ? "1" : "0"); } catch (e) {} touches = {}; recount(); reset(); showGhost(); });
+  var mtT = 0;
+  function cycleMode() {
+    if (state === "run") return;
+    mode = (mode + 1) % 3; try { localStorage.setItem("kenneysrace-ghost", String(mode)); } catch (e) {}
+    updMode(); touches = {}; recount(); reset(); showGhost();
+    var el = $("mt"); el.textContent = mode === 0 ? "Normal" : mode === 1 ? "Geist: Bot " + GHOST.t.toFixed(2) + "s" : recGhost ? "Geist: dein Rekord " + recGhost.t.toFixed(2) + "s" : "Geist: dein Rekord (ab nächstem Rekord)";
+    el.className = "mt on"; clearTimeout(mtT); mtT = setTimeout(function () { el.className = "mt"; }, 1300);
+  }
+  bindTap($("gb"), cycleMode);
   showGhost();
   bindTap($("ok"), function () { touches = {}; recount(); reset(); });
   reset();
