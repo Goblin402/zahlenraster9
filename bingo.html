@@ -1,0 +1,287 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Zoomen verhindern: Pinch-Gesten (Safari), Zwei-Finger-Bewegungen und Doppeltipp */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) {
+    var now = Date.now();
+    if (now - last < 350 && !(e.target.closest && e.target.closest("button"))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+})();
+</script>
+<style>html, body, body * { touch-action: none !important; overscroll-behavior: none; } html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }</style>
+<title>Bingo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&display=swap">
+<style>
+/* Bingo: Kugelreihe läuft von rechts nach links, tippe die Kachel, deren Zahl gerade in der Reihe ist.
+   Gemessen (390 x 844): Leben 18/266, Punkte 195/270, Bahn 10–380 / 315–391, Linie bei x 48, Kugeln 55 px im Abstand 80 px.
+   Kacheln 36–191 / 199–354 und 440–598 / 603–761. Tempo v(t) = 37,35 + 1,717 t − 0,00812 t² px/s.
+   Treffer kommen immer nach 2 oder 3 Kugeln. +1 Punkt pro Treffer und pro richtig durchgelassener Kugel.
+   Haken 0,22 s, Kreuz 0,23 s, Ergebnis 0,53 s nach dem letzten Leben. */
+:root { --font: "Unbounded", "Arial Black", system-ui, sans-serif; color-scheme: light; }
+html, body { height: 100%; }
+body { background: #f3f8fd; color: #202f34; font-family: var(--font); font-weight: 700; position: relative; overflow: hidden; margin: 0;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.bar { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 8px; align-items: center; z-index: 6; }
+.bar button, .best { background: rgba(16, 72, 86, 0.9); color: #f3fbfc; border: 0; border-radius: 999px; padding: 0.5em 0.95em; font: inherit; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.best b { opacity: 0.6; margin-right: 0.35em; }
+.bar button { cursor: pointer; }
+.bar button:focus-visible { outline: 2px solid #104856; outline-offset: 2px; }
+.lives { position: absolute; left: calc(18 / 390 * 100%); top: calc(266 / 844 * 100%); transform: translateY(-50%); display: flex; gap: calc(4 / 390 * 100vw); }
+.lives svg { width: calc(19 / 390 * 100vw); height: calc(19 / 390 * 100vw); display: block; }
+.lives .on path { fill: #e8434b; stroke: #c9303a; }
+.lives .on .hl { fill: #ff8c92; stroke: none; }
+.lives path { fill: #f6f5f0; stroke: #d8d7cd; stroke-width: 1.4; }
+.lives .hl { fill: none; stroke: none; }
+.score { position: absolute; left: 0; right: 0; top: calc(270 / 844 * 100%); transform: translateY(-50%); text-align: center; font-size: calc(38 / 390 * 100vw); font-weight: 800; color: #0c5564; line-height: 1; font-variant-numeric: tabular-nums; }
+.lane { position: absolute; left: calc(10 / 390 * 100%); width: calc(370 / 390 * 100%); top: calc(315 / 844 * 100%); height: calc(76 / 390 * 100vw);
+  background: #e3f5f5; border-radius: 999px; overflow: hidden; }
+.line { position: absolute; top: 0; bottom: 0; left: calc(38 / 370 * 100%); width: 1.5px; background: #a9c8c9; }
+.ball { position: absolute; left: 0; top: 50%; width: calc(55 / 370 * 100%); aspect-ratio: 1; margin-top: calc(-27.5 / 370 * 100%); border-radius: 50%;
+  box-sizing: border-box; background: #2a83c9; border: 1.5px solid #1f5f95; box-shadow: inset 0 0 0 2px rgba(38, 120, 184, 0.9);
+  color: #fff; display: flex; align-items: center; justify-content: center; font-size: calc(21 / 390 * 100vw); letter-spacing: 0.01em;
+  transition: transform 0.12s ease-out, background-color 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s; will-change: left; }
+.ball.got { background: #ddf0f2; border-color: #63a8b6; box-shadow: none; color: #6296a1; transform: scale(0.89); }
+.ball.miss { background: #e3514b; border-color: #b83a35; box-shadow: none; color: #fff; }
+.grid { position: absolute; left: calc(36 / 390 * 100%); width: calc(318 / 390 * 100%); top: calc(440 / 844 * 100%); height: calc(321 / 844 * 100%);
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; column-gap: calc(8 / 390 * 100vw); row-gap: calc(5 / 844 * 100vh); }
+.tile { position: relative; border: 0; border-radius: calc(14 / 390 * 100vw); background: #fff; color: #202f34; font: inherit; font-size: calc(45 / 390 * 100vw);
+  box-shadow: inset 0 0 0 1px #e9eef2, inset 0 calc(-4 / 390 * 100vw) 0 #dbdbd1; padding: 0 0 calc(4 / 390 * 100vw); cursor: pointer; letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: center; }
+.tile:focus-visible { outline: 3px solid #104856; outline-offset: 2px; }
+.tile span { transition: opacity 0.07s linear; }
+.tile.fresh span { opacity: 0.35; }
+.tile.ok { background: #137087; box-shadow: inset 0 calc(-4 / 390 * 100vw) 0 #0d5567; }
+.tile.no { background: #fbe4e4; box-shadow: inset 0 0 0 1.5px #d35855, inset 0 calc(-4 / 390 * 100vw) 0 #d35855; }
+.tile svg { display: none; position: absolute; left: 50%; top: 50%; }
+.tile.ok .ck { display: block; width: 34%; transform: translate(-50%, -54%); animation: pop 0.16s ease-out; }
+.tile.no .xx { display: block; width: 17%; transform: translate(-50%, -58%); }
+.tile.ok span, .tile.no span { visibility: hidden; }
+@keyframes pop { 0% { transform: translate(-50%, -54%) scale(0.4); } 100% { transform: translate(-50%, -54%) scale(1); } }
+.intro { position: absolute; inset: 0; z-index: 4; background: rgba(0, 0, 0, 0.74); color: #fff; }
+.intro[hidden] { display: none; }
+.intro p { position: absolute; left: 0; right: 0; top: calc(522 / 844 * 100%); transform: translateY(-50%); margin: 0; font-size: calc(25 / 390 * 100vw); text-align: center; line-height: 1.05; }
+.pulse { position: absolute; left: 50%; top: calc(690 / 844 * 100%); width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #fff; animation: pu 1.1s ease-in-out infinite; }
+@keyframes pu { 0%, 100% { transform: scale(0.75); opacity: 0.55; } 50% { transform: scale(1); opacity: 1; } }
+.result { position: absolute; inset: 0; z-index: 7; background: rgba(10, 22, 26, 0.9); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.result[hidden], .rec[hidden] { display: none; }
+.lbl { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.pts { font-size: min(13vw, 56px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rec { color: #ffd34d; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.result button { margin-top: 10px; background: #1f7a62; color: #fff; border: 2px solid #3fd6b0; border-radius: 12px; padding: 0.65em 1.6em; font: inherit; font-size: 17px; cursor: pointer; }
+.result button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+</style>
+<div class="bar">
+  <button id="reset" type="button">&#8635; Reset</button>
+  <div class="best" id="best"><b>Best</b>--</div>
+</div>
+<div class="lives" id="lives"></div>
+<div class="score" id="score">0</div>
+<div class="lane" id="lane"><div class="line"></div></div>
+<div class="grid" id="grid"></div>
+<div class="intro" id="intro"><p>Erscheint eine<br>deiner Zahlen,<br>tippe sie!</p><div class="pulse"></div></div>
+<div class="result" id="result" hidden>
+  <div class="lbl">Dein Ergebnis</div>
+  <div class="pts" id="pts">0 Pts</div>
+  <div class="rec" id="rec" hidden>Neuer Rekord</div>
+  <button id="ok" type="button">&#10003; OKAY</button>
+</div>
+<script>
+(function () {
+  // Bahn-Einheiten: 0 = linker Rand der Bahn, 370 = rechter Rand (entspricht px bei 390 breitem Bildschirm)
+  var LANE_W = 370, LINE_X = 38, R = 27.5, GAP = 80, ENTER = 0.45, LIVES = 3;
+  var T_OK = 0.217, T_NO = 0.233, T_MISS = 0.28, T_END = 0.53;
+  var $ = function (id) { return document.getElementById(id); };
+  var lane = $("lane"), gridEl = $("grid");
+  var HEART = '<svg viewBox="0 0 24 22"><path d="M12 20.5C5.6 15.9 1.5 12.2 1.5 7.4 1.5 4.3 3.9 1.8 6.9 1.8c2.1 0 3.9 1.2 5.1 3 1.2-1.8 3-3 5.1-3 3 0 5.4 2.5 5.4 5.6 0 4.8-4.1 8.5-10.5 13.1z"/><ellipse class="hl" cx="7.2" cy="6.4" rx="2.4" ry="1.6" transform="rotate(-30 7.2 6.4)"/></svg>';
+  var CK = '<svg class="ck" viewBox="0 0 24 24"><path d="M4 12.5l5.2 5L20 6.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var XX = '<svg class="xx" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="#e3514b" stroke-width="5" stroke-linecap="round"/></svg>';
+  var tiles = [];
+  for (var i = 0; i < 4; i++) {
+    var b = document.createElement("button"); b.type = "button"; b.className = "tile"; b.innerHTML = "<span></span>" + CK + XX;
+    gridEl.appendChild(b); tiles.push({ el: b, sp: b.firstChild, n: 0, st: "", tm: 0 });
+  }
+  $("lives").innerHTML = HEART + HEART + HEART;
+  var hearts = [].slice.call($("lives").children);
+
+  var state = "intro", gen = 0, raf = 0, t0 = 0, last = 0, tau = 0, dist = 0, lives = LIVES, score = 0, best = 0;
+  var balls = [], nextIdx = 0, sinceMatch = 0, gapNeed = 0, timers = [];
+  try { best = parseInt(localStorage.getItem("bingo-best"), 10) || 0; } catch (e) {}
+  function showBest() { $("best").innerHTML = "<b>Best</b>" + (best ? best : "--"); }
+  showBest();
+  function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function speed(t) { t = Math.min(t, 90); return 37.35 + 1.717 * t - 0.00812 * t * t; }
+  function later(fn, s) { var g = gen; timers.push(setTimeout(function () { if (g === gen) fn(); }, s * 1000)); }
+  function inGrid(n) { return tiles.some(function (t) { return t.n === n; }); }
+  function onLane(n) { return balls.some(function (b) { return b.n === n && !b.done; }); }
+  function freshNumber() { var n; do { n = ri(1, 99); } while (inGrid(n) || onLane(n)); return n; }
+  function setTile(t, n) { t.n = n; t.sp.textContent = n || ""; }
+  function render() {
+    $("score").textContent = score;
+    hearts.forEach(function (h, i) { h.setAttribute("class", i < lives ? "on" : ""); });
+  }
+  // Nächste Kugel: die erste ist ein Treffer, danach kommt immer nach 2 oder 3 Kugeln wieder einer
+  function makeBall() {
+    var match = false;
+    if (nextIdx === 0) match = true;
+    else if (sinceMatch >= gapNeed) match = true;
+    var n = 0;
+    if (match) {
+      var free = tiles.filter(function (t) { return t.n && !onLane(t.n); });
+      if (free.length) n = free[ri(0, free.length - 1)].n; else match = false;
+    }
+    if (!match) { do { n = ri(1, 99); } while (inGrid(n) || onLane(n)); }
+    if (match) { sinceMatch = 0; gapNeed = ri(2, 3); } else sinceMatch++;
+    var el = document.createElement("div"); el.className = "ball"; el.textContent = n; lane.appendChild(el);
+    var b = { n: n, i: nextIdx, el: el, x: 9999, got: false, done: false };
+    nextIdx++; balls.push(b); return b;
+  }
+  function place() {
+    var k = lane.clientWidth / LANE_W;
+    balls.forEach(function (b) { b.el.style.left = ((b.x - R) * k).toFixed(2) + "px"; });
+  }
+  var d0 = 0; // Strecke, nach der die erste Kugel am rechten Rand erscheint
+  function loseLife() {
+    lives--; render();
+    if (navigator.vibrate) { try { navigator.vibrate(40); } catch (x) {} }
+    if (lives <= 0) gameOver();
+  }
+  function flash(t, cls, dur, after) {
+    t.st = cls; t.el.className = "tile " + cls; clearTimeout(t.tm);
+    var g = gen;
+    t.tm = setTimeout(function () { if (g !== gen) return; t.st = ""; t.el.className = "tile"; if (after) after(); }, dur * 1000);
+  }
+  function newNumberFor(t) {
+    setTile(t, freshNumber()); t.el.className = "tile fresh"; void t.el.offsetWidth;
+    var g = gen; requestAnimationFrame(function () { if (g === gen && !t.st) t.el.className = "tile"; });
+  }
+  function tapTile(idx) {
+    if (state !== "run") return;
+    var t = tiles[idx]; if (t.st || !t.n) return;
+    var hit = null;
+    balls.forEach(function (b) { if (!hit && !b.got && !b.done && b.n === t.n && b.x - R < LANE_W && b.x > LINE_X) hit = b; });
+    if (hit) {
+      hit.got = true; hit.el.className = "ball got"; score++; render();
+      t.n = 0;
+      flash(t, "ok", T_OK, function () { newNumberFor(t); });
+    } else {
+      flash(t, "no", T_NO);
+      loseLife();
+    }
+  }
+  function step(dt) {
+    tau += dt; dist += speed(tau) * dt;
+    // Kugeln erzeugen: Kugel i ist bei Strecke ENTER-Strecke + i*GAP gerade am rechten Rand
+    while (dist >= d0 + GAP * nextIdx - 1e-6) makeBall();
+    balls.forEach(function (b) { b.x = LANE_W + R - (dist - d0 - GAP * b.i); });
+    for (var j = 0; j < balls.length && state === "run"; j++) {
+      var b = balls[j];
+      if (b.done || b.x > LINE_X) continue;
+      b.done = true;
+      if (b.got) continue;
+      var t = null; tiles.forEach(function (x) { if (x.n === b.n) t = x; });
+      if (t) {
+        b.el.className = "ball miss";
+        var tt = t; tt.n = 0;
+        flash(tt, "no", T_MISS, function () { if (state === "run") newNumberFor(tt); });
+        loseLife();
+      } else { score++; render(); }
+    }
+    // weg, wenn ganz links raus
+    balls = balls.filter(function (b) { if (b.x + R < -4) { b.el.remove(); return false; } return true; });
+  }
+  function frame(ts) {
+    if (state !== "run") return;
+    var dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+    step(dt); place();
+    if (state === "run") raf = requestAnimationFrame(frame);
+  }
+  function reset() {
+    gen++; cancelAnimationFrame(raf); timers.forEach(clearTimeout); timers = [];
+    state = "intro"; tau = 0; dist = 0; lives = LIVES; score = 0; nextIdx = 0; sinceMatch = 0; gapNeed = 2;
+    balls.forEach(function (b) { b.el.remove(); }); balls = [];
+    tiles.forEach(function (t) { clearTimeout(t.tm); t.st = ""; t.el.className = "tile"; t.n = 0; });
+    tiles.forEach(function (t) { setTile(t, freshNumber()); });
+    $("intro").hidden = false; $("result").hidden = true; render();
+  }
+  function start() {
+    state = "run"; $("intro").hidden = true;
+    // Strecke bis zum Eintritt der ersten Kugel (nach 0,45 s)
+    var s = 0, tt = 0; while (tt < ENTER) { s += speed(tt) * 0.001; tt += 0.001; } d0 = s;
+    last = performance.now(); raf = requestAnimationFrame(frame);
+  }
+  function gameOver() {
+    state = "done"; cancelAnimationFrame(raf);
+    var rec = score > best;
+    if (rec) { best = score; try { localStorage.setItem("bingo-best", String(best)); } catch (e) {} showBest(); }
+    $("rec").hidden = !rec; $("pts").textContent = score + " Pts";
+    later(function () { $("result").hidden = false; }, T_END);
+  }
+  tiles.forEach(function (t, i) {
+    t.el.addEventListener("pointerdown", function (e) { e.preventDefault(); tapTile(i); });
+  });
+  $("intro").addEventListener("pointerdown", function (e) { e.preventDefault(); if (state === "intro") start(); });
+  function bindTap(el, fn) { el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); fn(); }); }
+  bindTap($("reset"), reset); bindTap($("ok"), reset);
+  window.addEventListener("resize", place);
+  // iOS: Lupe/Textauswahl beim Halten unterdrücken (Knöpfe der Leiste/Ergebnis ausgenommen)
+  document.addEventListener("touchstart", function (e) { var el = e.target; if (!(el.closest && el.closest(".bar, .result, #trx"))) e.preventDefault(); }, { passive: false });
+  ["selectstart", "contextmenu", "dragstart"].forEach(function (ty) { document.addEventListener(ty, function (e) { e.preventDefault(); }); });
+  reset();
+  window.__bg = {
+    get s() { return { state: state, tau: tau, score: score, lives: lives, grid: tiles.map(function (t) { return t.n; }), balls: balls.map(function (b) { return { n: b.n, x: b.x, got: b.got, done: b.done }; }) }; },
+    tap: tapTile, step: function (dt) { step(dt); place(); }, speed: speed
+  };
+})();
+</script>
+<style>
+#trx{position:fixed;inset:0;z-index:99999;background:rgba(8,6,12,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;color:#fff;font:600 15px system-ui,-apple-system,sans-serif;text-align:center}
+#trx[hidden]{display:none}
+#trx, #trx *{touch-action:manipulation !important;-webkit-user-select:text;user-select:text}
+#trx h2{font:800 20px system-ui,-apple-system,sans-serif;margin:0}
+#trx p{margin:0;max-width:340px;opacity:.8;line-height:1.35}
+#trx textarea{width:min(340px,90vw);height:110px;border-radius:12px;border:1px solid #555;background:#1b1b1f;color:#eee;font:12px ui-monospace,monospace;padding:10px;resize:none}
+#trx .row{display:flex;gap:10px}
+#trx button{border:0;border-radius:12px;padding:12px 18px;font:800 16px system-ui,-apple-system,sans-serif;cursor:pointer;background:#3a3a3c;color:#fff}
+#trx button.main{background:#f5d55a;color:#111}
+#trx button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+<div id="trx" hidden role="dialog" aria-modal="true" aria-labelledby="trx-h">
+  <h2 id="trx-h">Highscores übertragen</h2>
+  <p>Kopiere den Code und füge ihn in der Trainer-App unter „Highscores übertragen“ ein.</p>
+  <textarea id="trx-code" readonly aria-label="Übertragungscode"></textarea>
+  <div class="row"><button class="main" id="trx-copy" type="button">Kopieren</button><button id="trx-close" type="button">Schließen</button></div>
+</div>
+<script>
+/* Highscores übertragen: "Best" lange drücken (0,6 s) zeigt einen Code mit allen gespeicherten Werten dieser App. */
+(function () {
+  var best = document.getElementById("best"), box = document.getElementById("trx");
+  if (!best || !box) return;
+  var code = document.getElementById("trx-code"), copyBtn = document.getElementById("trx-copy"), timer = 0;
+  function makeCode() {
+    var data = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+    return "TR1:" + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function show() { code.value = makeCode(); copyBtn.textContent = "Kopieren"; box.hidden = false; }
+  best.addEventListener("pointerdown", function () { clearTimeout(timer); timer = setTimeout(show, 600); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { best.addEventListener(t, function () { clearTimeout(timer); }); });
+  ["pointerdown", "pointerup", "click", "touchstart", "touchend"].forEach(function (t) {
+    box.addEventListener(t, function (e) { e.stopPropagation(); });
+  });
+  copyBtn.addEventListener("click", function () {
+    function done() { copyBtn.textContent = "Kopiert ✓"; }
+    try { navigator.clipboard.writeText(code.value).then(done, function () { code.select(); document.execCommand("copy"); done(); }); }
+    catch (e) { code.select(); try { document.execCommand("copy"); done(); } catch (e2) {} }
+  });
+  document.getElementById("trx-close").addEventListener("click", function () { box.hidden = true; });
+})();
+</script>
+
+</body></html>
